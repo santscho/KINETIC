@@ -190,9 +190,17 @@ void StepGrid::paint (juce::Graphics& g)
 
                     if (cell.getWidth() >= 30.0f)
                     {
+                        // The bar grows away from the centre line, so the number goes in the
+                        // half the bar leaves empty: a positive pitch fills upwards, a negative
+                        // one downwards. Centring it there keeps it off the row edges, where it
+                        // would read as belonging to the row above or below.
+                        const auto freeHalf = value.pitch > 0 ? cell.withTop (centre)
+                                                              : cell.withBottom (centre);
+
                         g.setColour (theme::text.withAlpha (dim * 0.9f));
                         g.setFont (theme::mono (8.5f));
-                        g.drawText (formatPitch (value.pitch), cell, juce::Justification::centred, false);
+                        g.drawText (formatPitch (value.pitch), freeHalf.reduced (0.0f, 1.0f),
+                                    juce::Justification::centred, false);
                     }
                     break;
                 }
