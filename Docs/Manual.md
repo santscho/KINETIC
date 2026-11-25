@@ -155,7 +155,7 @@ Seven rows, one column per step:
 | `VEL` | Pointer height | 0–127, default 100 |
 | `MOD` | Pointer height | 0–127, default 64 |
 | `GATE` | Pointer height | 2–100 % of the step, default 50 % |
-| `RATCH` | Pointer height | 1–8 sub-triggers per step |
+| `RATCH` | Pointer height; the `-` strip at the bottom of the cell switches it off | 1–8 sub-triggers per step |
 | `SLIDE` | Click or drag toggles | on / off |
 
 `TRIG` and `SLIDE` toggle based on the cell you first touched in the gesture, so a drag across a
@@ -285,6 +285,9 @@ Per step, applied per completed pass of the lane's trigger loop:
 Per step: micro timing −50…+50 % of the step, probability 0–100 % (evaluated per step), ratchets
 1–8 with a velocity ramp of `flat`, `rampUp` or `rampDown` applied across the sub-triggers.
 
+Ratchet counts are edited in the grid's `RATCH` row, where the strip along the bottom of a cell
+switches the ratchet off (one ratchet) instead of making you aim at the lowest eighth of the cell.
+Micro timing, probability and the ratchet velocity ramp are still state-format only.
 ---
 
 ## 7. Timing model
