@@ -287,6 +287,8 @@ Per step: micro timing −50…+50 % of the step, probability 0–100 % (evaluat
 
 Ratchet counts are edited in the grid's `RATCH` row, where the strip along the bottom of a cell
 switches the ratchet off (one ratchet) instead of making you aim at the lowest eighth of the cell.
+The strip takes about a third of the row, so it grows into a comfortable target when the editor is
+enlarged.
 Micro timing, probability and the ratchet velocity ramp are still state-format only.
 ---
 

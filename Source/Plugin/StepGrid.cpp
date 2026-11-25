@@ -19,10 +19,15 @@ namespace
         return (pitch > 0 ? "+" : "") + juce::String (pitch);
     }
 
-    /** The strip along the bottom of a RATCH cell that switches the ratchet off. */
+    /** The strip along the bottom of a RATCH cell that switches the ratchet off.
+
+        It takes a third of the cell so it grows into a comfortable click target when the
+        editor is enlarged, keeping a few pixels at small sizes and a ceiling so it never
+        swallows the ratchet level above it in a very tall row.
+    */
     juce::Rectangle<float> ratchetClearStrip (juce::Rectangle<float> cell) noexcept
     {
-        const auto height = juce::jmin (7.0f, cell.getHeight() * 0.34f);
+        const auto height = juce::jlimit (5.0f, 22.0f, cell.getHeight() * 0.34f);
         return cell.withTop (cell.getBottom() - height).reduced (1.0f, 0.5f);
     }
 } // namespace
