@@ -14,8 +14,8 @@ namespace
                                              "PENDULUM", "RANDOM WALK" };
 } // namespace
 
-PatternEditor::PatternEditor (SharedPattern& sharedPattern)
-    : shared (sharedPattern), grid (sharedPattern)
+PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& selectedLaneRef)
+    : shared (sharedPattern), selectedLane (selectedLaneRef), grid (sharedPattern)
 {
     addAndMakeVisible (grid);
 
@@ -114,12 +114,20 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern)
         shared.publish();
     }
 
-    selectLane (0);
+    selectLane (selectedLane.load());
+}
+
+void PatternEditor::refreshAll()
+{
+    selectLane (juce::jlimit (0, maxLanes - 1, selectedLane.load()));
+    grid.refresh();
+    repaint();
 }
 
 void PatternEditor::selectLane (int index)
 {
     laneIndex = juce::jlimit (0, maxLanes - 1, index);
+    selectedLane.store (laneIndex);
     laneButtons[laneIndex]->setToggleState (true, juce::dontSendNotification);
 
     grid.setLane (laneIndex);

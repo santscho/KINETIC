@@ -6,7 +6,8 @@ namespace kinetic
 {
 
 KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor& p)
-    : juce::AudioProcessorEditor (&p), audioProcessor (p), patternEditor (p.getSharedPattern())
+    : juce::AudioProcessorEditor (&p), audioProcessor (p),
+      patternEditor (p.getSharedPattern(), p.getSelectedLane())
 {
     setOpaque (true);
     setResizable (true, true);
@@ -94,6 +95,13 @@ juce::String KineticAudioProcessorEditor::transportLine() const
 
 void KineticAudioProcessorEditor::timerCallback()
 {
+    // The host can load a state while the editor is open; re-read the pattern when it does.
+    if (const auto revision = audioProcessor.getPatternRevision(); revision != lastPatternRevision)
+    {
+        lastPatternRevision = revision;
+        patternEditor.refreshAll();
+    }
+
     repaint (0, getHeight() - 62, getWidth(), 62);
 }
 

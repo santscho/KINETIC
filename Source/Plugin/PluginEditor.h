@@ -32,6 +32,7 @@ private:
     juce::TextButton panicButton { "PANIC" };
     juce::Rectangle<int> footerArea;
     juce::TooltipWindow tooltipWindow { this, 600 };
+    juce::uint32 lastPatternRevision = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessorEditor)
 };

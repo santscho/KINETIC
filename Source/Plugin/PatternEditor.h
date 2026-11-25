@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "Core/Sequencer/SharedPattern.h"
@@ -18,9 +20,12 @@ namespace kinetic
 class PatternEditor final : public juce::Component
 {
 public:
-    explicit PatternEditor (SharedPattern& sharedPattern);
+    PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& selectedLane);
 
     void resized() override;
+
+    /** Re-reads the pattern after the host has loaded a state. */
+    void refreshAll();
 
 private:
     Lane& currentLane() noexcept { return shared.edit().lanes[static_cast<std::size_t> (laneIndex)]; }
@@ -30,6 +35,7 @@ private:
     void commit();
 
     SharedPattern& shared;
+    std::atomic<int>& selectedLane;
     StepGrid grid;
 
     juce::OwnedArray<juce::TextButton> laneButtons;

@@ -20,7 +20,8 @@ set (KINETIC_CORE_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SequenceMath.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.cpp"
-    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SharedPattern.h")
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SharedPattern.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/PatternState.h")
 
 set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h"

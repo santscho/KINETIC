@@ -70,12 +70,23 @@ public:
     /** Message thread: the pattern the editor edits; the audio thread adopts it per block. */
     kinetic::SharedPattern& getSharedPattern() noexcept { return sharedPattern; }
 
+    /** Message thread: the lane the editor is showing, saved alongside the pattern. */
+    std::atomic<int>& getSelectedLane() noexcept { return selectedLane; }
+
+    /** Bumped when the host loads a state, so an open editor can refresh itself. */
+    juce::uint32 getPatternRevision() const noexcept
+    {
+        return patternRevision.load (std::memory_order_relaxed);
+    }
+
 private:
     kinetic::TransportInput readTransportInput() const;
     void publishTelemetry (const kinetic::BlockTiming& timing) noexcept;
 
     kinetic::TransportEngine engine;
     kinetic::SharedPattern sharedPattern;
+    std::atomic<int> selectedLane { 0 };
+    std::atomic<juce::uint32> patternRevision { 0 };
     TransportView transportView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessor)

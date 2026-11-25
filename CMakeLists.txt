@@ -21,7 +21,7 @@
 cmake_minimum_required (VERSION 3.22)
 
 project (KINETIC
-    VERSION 0.4.0
+    VERSION 0.5.0
     DESCRIPTION "KINETIC - sample-accurate pure MIDI FX sequencer, licensed under the GNU General Public License v3.0 (GPLv3)"
     LANGUAGES C CXX OBJC OBJCXX)
 
@@ -128,7 +128,8 @@ if (KINETIC_BUILD_TESTS)
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestMain.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TimingEngineTests.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SequencerTests.cpp"
-                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SharedPatternTests.cpp")
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SharedPatternTests.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/PatternStateTests.cpp")
 endif()
 
 #-------------------------------------------------------------------------------

@@ -112,17 +112,21 @@ void StepGrid::paint (juce::Graphics& g)
     g.setColour (theme::panel);
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
 
-    // Step numbers, where they fit.
-    if (cellWidth >= 16.0f)
+    // Step numbers in the header strip above the rows; every fourth one when they are narrow.
+    const auto labelEvery = cellWidth >= 16.0f ? 1 : 4;
+
+    if (cellWidth >= 8.0f)
     {
         g.setFont (theme::mono (9.0f));
 
-        for (int step = 0; step < columns; ++step)
+        for (int step = 0; step < columns; step += labelEvery)
         {
             const auto cell = cellBounds (0, step);
+
             g.setColour (step >= loopLength ? theme::muted.withAlpha (0.4f) : theme::muted);
             g.drawText (juce::String (step + 1),
-                        cell.withHeight (static_cast<float> (headerHeight)),
+                        juce::Rectangle<float> (cell.getX(), 0.0f, cell.getWidth(),
+                                                static_cast<float> (headerHeight)),
                         juce::Justification::centred, false);
         }
     }

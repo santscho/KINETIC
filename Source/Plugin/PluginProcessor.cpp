@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include "Core/Sequencer/PatternState.h"
 #include "PluginEditor.h"
 
 namespace kinetic
@@ -125,6 +126,9 @@ void KineticAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     state.setAttribute ("version", kinetic::version);
     state.setAttribute ("format", kinetic::formatName);
 
+    // Read the message-thread copy, which is the one the editor writes.
+    kinetic::patternstate::writeToXml (sharedPattern.edit(), selectedLane.load(), state);
+
     copyXmlToBinary (state, destData);
 }
 
@@ -133,7 +137,21 @@ void KineticAudioProcessor::setStateInformation (const void* data, int sizeInByt
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
     {
         if (! xml->hasTagName ("KINETIC_STATE"))
+        {
             juce::Logger::writeToLog ("KINETIC: ignoring state with unexpected root element");
+            return;
+        }
+
+        auto lane = selectedLane.load();
+
+        // A state saved before patterns existed has no PATTERN element: the pattern stays as
+        // it is and the load still succeeds.
+        if (kinetic::patternstate::readFromXml (*xml, sharedPattern.edit(), lane))
+        {
+            sharedPattern.publish();          // the audio thread adopts it at its next block
+            selectedLane.store (lane);
+            patternRevision.fetch_add (1, std::memory_order_relaxed);
+        }
     }
 }
 
