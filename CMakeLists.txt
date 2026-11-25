@@ -11,13 +11,18 @@
 #
 #  Deliberately absent: any Standalone target, audio device management, network
 #  or telemetry code.
+#
+#  KINETIC is free software: licensed under the GNU General Public License
+#  version 3 (GPLv3), the same terms JUCE 8 is offered under for open-source
+#  projects. See LICENSE at the repository root. Building against JUCE under
+#  any other JUCE licence does not change the terms that apply to KINETIC.
 # ==============================================================================
 
 cmake_minimum_required (VERSION 3.22)
 
 project (KINETIC
-    VERSION 0.3.0
-    DESCRIPTION "KINETIC - sample-accurate pure MIDI FX sequencer"
+    VERSION 0.4.0
+    DESCRIPTION "KINETIC - sample-accurate pure MIDI FX sequencer, licensed under the GNU General Public License v3.0 (GPLv3)"
     LANGUAGES C CXX OBJC OBJCXX)
 
 if (NOT APPLE)
@@ -122,7 +127,8 @@ if (KINETIC_BUILD_TESTS)
         SOURCES ${KINETIC_CORE_SOURCES}
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestMain.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TimingEngineTests.cpp"
-                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SequencerTests.cpp")
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SequencerTests.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SharedPatternTests.cpp")
 endif()
 
 #-------------------------------------------------------------------------------

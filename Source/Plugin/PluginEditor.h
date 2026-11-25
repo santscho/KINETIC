@@ -1,16 +1,16 @@
 #pragma once
 
+#include "PatternEditor.h"
 #include "PluginProcessor.h"
 
 namespace kinetic
 {
 
 /**
-    Step 2 editor.
+    Step 4 editor: the pattern panel, the transport read-out and the panic button.
 
-    Still a placeholder for the Step 4 grid, but it now reads live timing telemetry and owns
-    the only producer on the UI -> audio command queue (PANIC). The 20 Hz timer only refreshes
-    the display; MIDI generation happens exclusively in processBlock.
+    The 20 Hz timer refreshes the telemetry line only - MIDI generation happens exclusively in
+    processBlock.
 */
 class KineticAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                           private juce::Timer
@@ -26,10 +26,12 @@ private:
     void timerCallback() override;
 
     juce::String transportLine() const;
-    juce::Rectangle<int> transportPanelBounds() const;
 
     KineticAudioProcessor& audioProcessor;
+    PatternEditor patternEditor;
     juce::TextButton panicButton { "PANIC" };
+    juce::Rectangle<int> footerArea;
+    juce::TooltipWindow tooltipWindow { this, 600 };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessorEditor)
 };

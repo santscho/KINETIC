@@ -1,34 +1,17 @@
 #include "PluginEditor.h"
 
+#include "Theme.h"
+
 namespace kinetic
 {
 
-namespace
-{
-const auto backgroundColour = juce::Colour (0xff0e1014);
-const auto panelColour      = juce::Colour (0xff171b22);
-const auto accentColour     = juce::Colour (0xff4ff0c0);
-const auto textColour       = juce::Colour (0xffe7ecf3);
-const auto mutedColour      = juce::Colour (0xff7c8797);
-
-juce::Font headingFont (float height)
-{
-    return juce::Font (juce::FontOptions (height).withStyle ("Bold"));
-}
-
-juce::Font monoFont (float height)
-{
-    return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(),
-                                          height, juce::Font::plain));
-}
-} // namespace
-
 KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor& p)
-    : juce::AudioProcessorEditor (&p), audioProcessor (p)
+    : juce::AudioProcessorEditor (&p), audioProcessor (p), patternEditor (p.getSharedPattern())
 {
     setOpaque (true);
     setResizable (true, true);
-    setResizeLimits (420, 210, 1260, 630);
+    setResizeLimits (860, 470, 1600, 900);
+    setSize (1040, 580);
 
     panicButton.setTooltip ("Release every held note and reset controllers");
     panicButton.onClick = [this]
@@ -37,63 +20,52 @@ KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor&
     };
 
     addAndMakeVisible (panicButton);
+    addAndMakeVisible (patternEditor);
 
-    setSize (560, 236);
     startTimerHz (20);
 }
 
 void KineticAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    auto area = getLocalBounds().toFloat();
+    g.fillAll (theme::background);
 
-    g.setColour (backgroundColour);
-    g.fillRoundedRectangle (area, 12.0f);
+    auto area = getLocalBounds().reduced (16, 14);
+    auto header = area.removeFromTop (28);
 
-    auto content = area.reduced (20.0f, 18.0f);
+    g.setColour (theme::accent);
+    g.fillRoundedRectangle (header.removeFromLeft (3).toFloat(), 1.5f);
+    header.removeFromLeft (10);
 
-    g.setColour (accentColour);
-    g.fillRoundedRectangle (content.removeFromTop (3.0f).removeFromLeft (48.0f), 1.5f);
+    auto badge = header.removeFromRight (132);
 
-    content.removeFromTop (10.0f);
+    g.setColour (theme::text);
+    g.setFont (theme::heading (19.0f));
+    g.drawText ("KINETIC", header, juce::Justification::centredLeft, false);
 
-    g.setColour (textColour);
-    g.setFont (headingFont (28.0f));
-    g.drawText ("KINETIC", content.removeFromTop (34.0f), juce::Justification::topLeft, false);
+    g.setColour (theme::panel);
+    g.fillRoundedRectangle (badge.toFloat().reduced (0.0f, 2.0f), 5.0f);
 
-    g.setColour (mutedColour);
-    g.setFont (headingFont (12.0f));
-    g.drawText ("sample-accurate pure MIDI FX sequencer",
-                content.removeFromTop (18.0f), juce::Justification::topLeft, false);
+    g.setColour (theme::accent);
+    g.setFont (theme::mono (10.0f));
+    g.drawText (kinetic::formatName, badge, juce::Justification::centred, false);
 
-    content.removeFromTop (12.0f);
-
-    auto badge = content.removeFromTop (22.0f).removeFromLeft (176.0f);
-    g.setColour (panelColour);
-    g.fillRoundedRectangle (badge, 5.0f);
-    g.setColour (accentColour);
-    g.setFont (monoFont (11.0f));
-    g.drawText (kinetic::formatName, badge.reduced (9.0f, 0.0f),
-                juce::Justification::centredLeft, false);
-
-    const auto panel = transportPanelBounds();
-
-    if (! panel.isEmpty())
+    if (! footerArea.isEmpty())
     {
-        g.setColour (panelColour);
-        g.fillRoundedRectangle (panel.toFloat(), 6.0f);
-
-        g.setColour (textColour);
-        g.setFont (monoFont (12.5f));
-        g.drawText (transportLine(), panel.reduced (12, 0),
-                    juce::Justification::centredLeft, false);
+        g.setColour (theme::muted);
+        g.setFont (theme::mono (11.0f));
+        g.drawText (transportLine(), footerArea, juce::Justification::centredLeft, false);
     }
 }
 
-juce::Rectangle<int> KineticAudioProcessorEditor::transportPanelBounds() const
+void KineticAudioProcessorEditor::resized()
 {
-    auto area = getLocalBounds().reduced (20, 18);
-    area.removeFromBottom (34);                      // space for the panic row
-    return area.removeFromBottom (46);
+    auto area = getLocalBounds().reduced (16, 14);
+    area.removeFromTop (38);
+
+    footerArea = area.removeFromBottom (26);
+    panicButton.setBounds (footerArea.removeFromRight (74));
+
+    patternEditor.setBounds (area);
 }
 
 juce::String KineticAudioProcessorEditor::transportLine() const
@@ -120,15 +92,9 @@ juce::String KineticAudioProcessorEditor::transportLine() const
     return line;
 }
 
-void KineticAudioProcessorEditor::resized()
-{
-    auto area = getLocalBounds().reduced (20, 18);
-    panicButton.setBounds (area.removeFromBottom (26).removeFromRight (78));
-}
-
 void KineticAudioProcessorEditor::timerCallback()
 {
-    repaint();
+    repaint (0, getHeight() - 62, getWidth(), 62);
 }
 
 } // namespace kinetic

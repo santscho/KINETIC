@@ -5,6 +5,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Core/KineticConfig.h"
+#include "Core/Sequencer/SharedPattern.h"
 #include "Core/Timing/TransportEngine.h"
 
 namespace kinetic
@@ -66,11 +67,15 @@ public:
 
     const TransportView& getTransportView() const noexcept { return transportView; }
 
+    /** Message thread: the pattern the editor edits; the audio thread adopts it per block. */
+    kinetic::SharedPattern& getSharedPattern() noexcept { return sharedPattern; }
+
 private:
     kinetic::TransportInput readTransportInput() const;
     void publishTelemetry (const kinetic::BlockTiming& timing) noexcept;
 
     kinetic::TransportEngine engine;
+    kinetic::SharedPattern sharedPattern;
     TransportView transportView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessor)

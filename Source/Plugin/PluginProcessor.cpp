@@ -73,6 +73,10 @@ void KineticAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // The plug-in never produces audio: the output bus exists purely for host compatibility.
     buffer.clear();
 
+    // Adopt whatever the editor published since the last block, before anything is generated.
+    if (const auto* published = sharedPattern.takeLatest())
+        engine.setPattern (*published);
+
     // Derives sample offsets from host PPQ and flushes any note left hanging by a stop,
     // locate or loop wrap - all inside the audio callback, before anything is generated.
     const auto& timing = engine.beginBlock (readTransportInput(), buffer.getNumSamples());

@@ -19,7 +19,8 @@ set (KINETIC_CORE_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SequencerTypes.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SequenceMath.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.h"
-    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.cpp")
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.cpp"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SharedPattern.h")
 
 set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h"
@@ -27,6 +28,11 @@ set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PluginProcessor.cpp"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PluginEditor.h"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PluginEditor.cpp"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/PatternEditor.h"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/PatternEditor.cpp"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/StepGrid.h"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/StepGrid.cpp"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/Theme.h"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PluginEntry.cpp")
 
 # kinetic_add_plugin_target (

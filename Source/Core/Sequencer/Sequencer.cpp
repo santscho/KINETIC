@@ -9,6 +9,8 @@ namespace
 {
     int clampChannel (int channel) noexcept { return juce::jlimit (1, 16, channel); }
 
+    int clampLength (int length) noexcept { return juce::jlimit (1, maxSteps, length); }
+
     /** Velocity multiplier for one sub-trigger of a ratchet group. */
     float ratchetGain (VelocityRamp ramp, int index, int count) noexcept
     {
@@ -56,32 +58,26 @@ void Sequencer::reset() noexcept
 
 void Sequencer::resetLanePhases (const BlockTiming& timing) noexcept
 {
-    for (int i = 0; i < maxLanes; ++i)
+    for (std::size_t i = 0; i < runtime.size(); ++i)
     {
-        auto& rt = runtime[static_cast<std::size_t> (i)];
-        const auto& settings = patternData.lanes[static_cast<std::size_t> (i)].settings;
+        const auto& settings = patternData.lanes[i].settings;
+        auto& rt = runtime[i];
 
-        const auto gateLength = juce::jlimit (1, maxSteps, settings.gateLength);
-        const auto pitchLength = juce::jlimit (1, maxSteps, settings.pitchLength);
-        const auto velocityLength = juce::jlimit (1, maxSteps, settings.velocityLength);
-        const auto modLength = juce::jlimit (1, maxSteps, settings.modLength);
-
-        // A reversed lane starts at the end of each of its loops.
+        // Each sub-lane restarts at the head of each of its own loops.
         const auto startFor = [&settings] (int length)
         {
-            return settings.direction == PlayDirection::reverse ? length - 1 : 0;
+            const auto clamped = clampLength (length);
+            return settings.direction == PlayDirection::reverse ? clamped - 1 : 0;
         };
 
-        rt.gateWalk.reset (startFor (gateLength));
-        rt.pitchWalk.reset (startFor (pitchLength));
-        rt.velocityWalk.reset (startFor (velocityLength));
-        rt.modWalk.reset (startFor (modLength));
+        rt.gateWalk.reset (startFor (settings.gateLength));
+        rt.pitchWalk.reset (startFor (settings.pitchLength));
+        rt.velocityWalk.reset (startFor (settings.velocityLength));
+        rt.modWalk.reset (startFor (settings.modLength));
 
         rt.tick = 0;
-        rt.cycle = 0;
         rt.nextStepPpq = timing.blockStartPpq;
-        rt.offs = {};
-        rt.ons = {};
+        rt.pending = {};
         rt.lastNote = -1;
         rt.baseNote = -1;
         rt.currentBend = 8192;
@@ -92,141 +88,99 @@ void Sequencer::resetLanePhases (const BlockTiming& timing) noexcept
 void Sequencer::clearPending() noexcept
 {
     for (auto& lane : runtime)
+        lane.pending = {};
+}
+
+Sequencer::PendingNote* Sequencer::nextEvent (LaneRuntime& lane) noexcept
+{
+    PendingNote* earliest = nullptr;
+    auto earliestKey = std::pair { noEventPpq, true };
+
+    for (auto& pending : lane.pending)
     {
-        lane.offs = {};
-        lane.ons = {};
-    }
-}
+        if (pending.isFree())
+            continue;
 
-double Sequencer::earliestOffPpq (const LaneRuntime& lane) const noexcept
-{
-    double earliest = noEventPpq;
+        // Sorting on (ppq, onSent) puts every release before the note-ons sharing its instant.
+        const auto key = std::pair { pending.nextPpq(), pending.onSent };
 
-    for (const auto& off : lane.offs)
-        if (off.active && off.offPpq < earliest)
-            earliest = off.offPpq;
-
-    return earliest;
-}
-
-double Sequencer::earliestOnPpq (const LaneRuntime& lane) const noexcept
-{
-    double earliest = noEventPpq;
-
-    for (const auto& on : lane.ons)
-        if (on.active && on.onPpq < earliest)
-            earliest = on.onPpq;
-
-    return earliest;
-}
-
-Sequencer::PendingOff* Sequencer::findEarliestOff (LaneRuntime& lane) noexcept
-{
-    PendingOff* earliest = nullptr;
-
-    for (auto& off : lane.offs)
-        if (off.active && (earliest == nullptr || off.offPpq < earliest->offPpq))
-            earliest = &off;
-
-    return earliest;
-}
-
-Sequencer::PendingOn* Sequencer::findEarliestOn (LaneRuntime& lane) noexcept
-{
-    PendingOn* earliest = nullptr;
-
-    for (auto& on : lane.ons)
-        if (on.active && (earliest == nullptr || on.onPpq < earliest->onPpq))
-            earliest = &on;
-
-    return earliest;
-}
-
-void Sequencer::emitOff (PendingOff& off, const BlockTiming& timing,
-                         MidiEventSink& sink, NoteTracker& notes) noexcept
-{
-    const auto ppq = juce::jmax (off.offPpq, timing.blockStartPpq);
-    notes.noteOff (sink, off.channel, off.note, timing.sampleOffsetForPpq (ppq));
-    off.active = false;
-}
-
-void Sequencer::emitOn (LaneRuntime& lane, PendingOn& on, const BlockTiming& timing,
-                        MidiEventSink& sink, NoteTracker& notes) noexcept
-{
-    const auto ppq = juce::jmax (on.onPpq, timing.blockStartPpq);
-    notes.noteOn (sink, on.channel, on.note, on.velocity, timing.sampleOffsetForPpq (ppq));
-
-    // Hand the release over to the off timeline so the note is never left sounding.
-    scheduleOff (lane, on.channel, on.note, on.offPpq);
-    on.active = false;
-}
-
-void Sequencer::scheduleOff (LaneRuntime& lane, int channel, int note, double offPpq) noexcept
-{
-    for (auto& off : lane.offs)
-    {
-        if (! off.active)
+        if (earliest == nullptr || key < earliestKey)
         {
-            off = { true, channel, note, offPpq };
+            earliest = &pending;
+            earliestKey = key;
+        }
+    }
+
+    return earliest;
+}
+
+void Sequencer::emitNext (PendingNote& pending, const BlockTiming& timing,
+                          MidiEventSink& sink, NoteTracker& notes) noexcept
+{
+    const auto offset = timing.sampleOffsetForPpq (juce::jmax (pending.nextPpq(),
+                                                               timing.blockStartPpq));
+
+    if (! pending.onSent)
+    {
+        notes.noteOn (sink, pending.channel, pending.note, pending.velocity, offset);
+        pending.onSent = true;
+        return;
+    }
+
+    notes.noteOff (sink, pending.channel, pending.note, offset);
+    pending.channel = 0;
+}
+
+void Sequencer::queueNote (LaneRuntime& lane, int channel, int note, float velocity,
+                           double onPpq, double offPpq) noexcept
+{
+    for (auto& pending : lane.pending)
+    {
+        if (pending.isFree())
+        {
+            pending = { channel, note, velocity, onPpq, offPpq, false };
             return;
         }
     }
 
-    // Deliberately drop rather than mis-time: the note stays tracked, and the transport
-    // engine's panic path (or the next stop) is the safety net.
+    // Unreachable with 32 slots against one step's eight ratchets plus the gate still
+    // sounding. Dropping the sub-trigger is the only safe failure: a note emitted without a
+    // stored release would outlive its step.
 }
 
-void Sequencer::queueNoteOn (LaneRuntime& lane, int channel, int note, float velocity,
-                             double onPpq, double offPpq, const BlockTiming& timing,
-                             MidiEventSink& sink, NoteTracker& notes) noexcept
+void Sequencer::extendRelease (LaneRuntime& lane, int channel, int note, double offPpq) noexcept
 {
-    for (auto& on : lane.ons)
-    {
-        if (! on.active)
-        {
-            on = { true, channel, note, velocity, onPpq, offPpq };
-            return;
-        }
-    }
-
-    // Queue full (should not happen with 8 ratchets and 64 slots): sound the note now at the
-    // block boundary so it is never silently lost, then release it.
-    notes.noteOn (sink, channel, note, velocity, 0);
-    notes.noteOff (sink, channel, note, timing.sampleOffsetForPpq (juce::jmax (offPpq,
-                                                                               timing.blockStartPpq)));
-}
-
-void Sequencer::extendPendingOff (LaneRuntime& lane, int channel, int note, double offPpq) noexcept
-{
-    for (auto& off : lane.offs)
-        if (off.active && off.channel == channel && off.note == note)
-            off.offPpq = juce::jmax (off.offPpq, offPpq);
+    for (auto& pending : lane.pending)
+        if (! pending.isFree() && pending.onSent
+             && pending.channel == channel && pending.note == note)
+            pending.offPpq = juce::jmax (pending.offPpq, offPpq);
 }
 
 void Sequencer::emitBendRamps (const BlockTiming& timing, MidiEventSink& sink) noexcept
 {
-    for (int i = 0; i < maxLanes; ++i)
+    for (std::size_t i = 0; i < runtime.size(); ++i)
     {
-        auto& rt = runtime[static_cast<std::size_t> (i)];
-        const auto& settings = patternData.lanes[static_cast<std::size_t> (i)].settings;
+        auto& rt = runtime[i];
 
         if (! rt.bendActive)
             continue;
 
-        const auto channel = clampChannel (settings.midiChannel);
-        const auto duration = rt.bendEndPpq - rt.bendStartPpq;
+        const auto span = rt.bendEndPpq - rt.bendStartPpq;
 
-        const auto emitAt = [&] (double ppq)
+        if (span <= 0.0)
         {
-            const auto t = duration > 0.0
-                             ? juce::jlimit (0.0, 1.0, (ppq - rt.bendStartPpq) / duration)
-                             : 1.0;
+            rt.bendActive = false;
+            continue;
+        }
 
-            const auto value = static_cast<int> (std::lround (
+        const auto channel = clampChannel (patternData.lanes[i].settings.midiChannel);
+
+        const auto bendTo = [&] (double ppq, double t)
+        {
+            rt.currentBend = juce::jlimit (0, 16383, static_cast<int> (std::lround (
                 static_cast<double> (rt.bendFrom)
-                    + static_cast<double> (rt.bendTo - rt.bendFrom) * t));
+                    + static_cast<double> (rt.bendTo - rt.bendFrom) * t)));
 
-            rt.currentBend = juce::jlimit (0, 16383, value);
             sink.add (juce::MidiMessage::pitchWheel (channel, rt.currentBend),
                       timing.sampleOffsetForPpq (ppq));
         };
@@ -234,32 +188,16 @@ void Sequencer::emitBendRamps (const BlockTiming& timing, MidiEventSink& sink) n
         const auto from = juce::jmax (rt.bendStartPpq, timing.blockStartPpq);
         const auto to = juce::jmin (rt.bendEndPpq, timing.blockEndPpq);
 
-        if (to <= from)
+        // Roughly one message per millisecond, then land exactly on the target.
+        const auto increment = timing.ppqPerSample * juce::jmax (1.0, sampleRate / 1000.0);
+
+        for (auto ppq = from; ppq < to; ppq += increment)
+            bendTo (ppq, (ppq - rt.bendStartPpq) / span);
+
+        if (timing.blockEndPpq >= rt.bendEndPpq)
         {
-            if (timing.blockStartPpq >= rt.bendEndPpq)
-            {
-                rt.currentBend = rt.bendTo;
-                rt.bendActive = false;
-            }
-
-            continue;
-        }
-
-        // Roughly one message per millisecond, plus the exact end point.
-        const auto increment = juce::jmax (timing.ppqPerSample * (sampleRate / 1000.0),
-                                           timing.ppqPerSample);
-
-        if (increment > 0.0)
-            for (auto ppq = juce::jmax (from, rt.bendEmittedPpq); ppq < to; ppq += increment)
-                emitAt (ppq);
-
-        rt.bendEmittedPpq = to;
-
-        if (to >= rt.bendEndPpq)
-        {
-            emitAt (rt.bendEndPpq);
+            bendTo (rt.bendEndPpq, 1.0);
             rt.bendActive = false;
-            rt.currentBend = rt.bendTo;
         }
     }
 }
@@ -276,130 +214,108 @@ void Sequencer::processBlock (const BlockTiming& timing, MidiEventSink& sink,
     if (timing.didStart || timing.didJump)
         resetLanePhases (timing);
 
-    for (int laneIndex = 0; laneIndex < maxLanes; ++laneIndex)
+    for (std::size_t i = 0; i < runtime.size(); ++i)
     {
-        const auto& lane = patternData.lanes[static_cast<std::size_t> (laneIndex)];
-        auto& rt = runtime[static_cast<std::size_t> (laneIndex)];
+        auto& rt = runtime[i];
+        const auto& lane = patternData.lanes[i];
+        const bool stepsAllowed = lane.settings.enabled;
 
-        // Merge note-offs, queued note-ons and step boundaries by PPQ. Offs win ties so a
-        // re-trigger always sees the previous note released.
+        // One timeline per lane: scheduled notes and step boundaries, whichever is next.
         for (int guard = 0; guard < 8192; ++guard)
         {
-            const auto offPpq = earliestOffPpq (rt);
-            const auto onPpq = earliestOnPpq (rt);
-            const auto stepPpq = rt.nextStepPpq;
+            auto* pending = nextEvent (rt);
+            const auto notePpq = pending != nullptr ? pending->nextPpq() : noEventPpq;
+            const bool stepDue = stepsAllowed && rt.nextStepPpq < timing.blockEndPpq;
 
-            const bool canStep = lane.settings.enabled && stepPpq < timing.blockEndPpq;
-
-            const auto nextOff = offPpq < timing.blockEndPpq;
-            const auto nextOn = onPpq < timing.blockEndPpq;
-
-            if (! canStep && ! nextOff && ! nextOn)
+            if (notePpq >= timing.blockEndPpq && ! stepDue)
                 break;
 
-            if (nextOff && offPpq <= onPpq && (! canStep || offPpq <= stepPpq))
+            if (! stepDue || notePpq <= rt.nextStepPpq)
             {
-                if (auto* off = findEarliestOff (rt))
-                    emitOff (*off, timing, sink, notes);
-                else
+                if (pending == nullptr)
                     break;
-            }
-            else if (nextOn && (! canStep || onPpq <= stepPpq))
-            {
-                if (auto* on = findEarliestOn (rt))
-                    emitOn (rt, *on, timing, sink, notes);
-                else
-                    break;
+
+                emitNext (*pending, timing, sink, notes);
             }
             else
             {
-                fireStep (laneIndex, stepPpq, timing, sink, notes);
+                fireStep (lane, rt, rt.nextStepPpq, timing, sink);
             }
         }
     }
 
-    // Flushed last: a slide that started part-way through this block still gets its ramp,
-    // and the sink sorts by sample offset so ordering in the host buffer is unaffected.
+    // Flushed last: a ramp that started part-way through this block still gets its messages,
+    // and the sink sorts by sample offset so the host buffer is unaffected.
     emitBendRamps (timing, sink);
 }
 
-void Sequencer::fireStep (int laneIndex, double stepStartPpq, const BlockTiming& timing,
-                          MidiEventSink& sink, NoteTracker& notes) noexcept
+void Sequencer::fireStep (const Lane& lane, LaneRuntime& rt, double stepStartPpq,
+                          const BlockTiming& timing, MidiEventSink& sink) noexcept
 {
-    const auto& lane = patternData.lanes[static_cast<std::size_t> (laneIndex)];
     const auto& settings = lane.settings;
-    auto& rt = runtime[static_cast<std::size_t> (laneIndex)];
 
-    const auto gateLength = juce::jlimit (1, maxSteps, settings.gateLength);
-    const auto pitchLength = juce::jlimit (1, maxSteps, settings.pitchLength);
-    const auto velocityLength = juce::jlimit (1, maxSteps, settings.velocityLength);
-    const auto modLength = juce::jlimit (1, maxSteps, settings.modLength);
-
-    const auto laneStep = rt.gateWalk.current();
-
-    const auto& triggerStep = lane.steps[static_cast<std::size_t> (laneStep)];
-    const auto& pitchStep = lane.steps[static_cast<std::size_t> (rt.pitchWalk.current())];
-    const auto& velocityStep = lane.steps[static_cast<std::size_t> (rt.velocityWalk.current())];
-    const auto& modStep = lane.steps[static_cast<std::size_t> (rt.modWalk.current())];
-
-    const auto channel = clampChannel (settings.midiChannel);
+    const auto gateLength = clampLength (settings.gateLength);
     const auto stepPpq = settings.clock.stepPpq();
-    const auto startPpq = stepStartPpq
-                            + stepPpq * (static_cast<double> (triggerStep.microTiming) / 100.0);
-    const auto sampleOffset = timing.sampleOffsetForPpq (startPpq);
+    const auto index = rt.gateWalk.current();
+    const auto& step = stepAt (lane, index);
 
     const bool triggered = settings.euclidEnabled
-                             ? math::euclidBitRotated (laneStep, settings.euclidSteps,
-                                                       settings.euclidPulses,
-                                                       settings.euclidRotation)
-                             : triggerStep.trigger;
+                             ? math::euclidBitRotated (index, settings.euclidSteps,
+                                                       settings.euclidPulses, settings.euclidRotation)
+                             : step.trigger;
 
-    if (triggered && math::conditionPasses (triggerStep.condition, rt.cycle))
+    // A cycle is one pass of the trigger pattern, so it is derived from the tick count
+    // rather than maintained beside it.
+    const auto cycle = static_cast<long long> (rt.tick) / gateLength;
+
+    if (triggered
+         && math::conditionPasses (step.condition, cycle)
+         && (step.probability >= 100
+              || rng.nextFloat() * 100.0f < static_cast<float> (step.probability)))
     {
-        const bool probabilityHit = triggerStep.probability >= 100
-                                      || rng.nextFloat() * 100.0f
-                                           < static_cast<float> (triggerStep.probability);
+        const auto startPpq = stepStartPpq
+                                + stepPpq * (static_cast<double> (step.microTiming) / 100.0);
 
-        if (probabilityHit)
-            emitStep (laneIndex, channel, startPpq, sampleOffset, stepPpq,
-                      triggerStep, pitchStep, velocityStep, modStep,
-                      timing, sink, notes);
+        emitStep (lane, rt, startPpq, timing, sink);
     }
 
     ++rt.tick;
 
-    if ((rt.tick % static_cast<long long> (gateLength)) == 0)
-        ++rt.cycle;
-
     rt.gateWalk.advance (gateLength, settings.direction, rng);
-    rt.pitchWalk.advance (pitchLength, settings.direction, rng);
-    rt.velocityWalk.advance (velocityLength, settings.direction, rng);
-    rt.modWalk.advance (modLength, settings.direction, rng);
+    rt.pitchWalk.advance (clampLength (settings.pitchLength), settings.direction, rng);
+    rt.velocityWalk.advance (clampLength (settings.velocityLength), settings.direction, rng);
+    rt.modWalk.advance (clampLength (settings.modLength), settings.direction, rng);
 
     rt.nextStepPpq = stepStartPpq + stepPpq;
 }
 
-void Sequencer::emitStep (int laneIndex, int channel, double startPpq, int sampleOffset,
-                          double stepPpq, const Step& triggerStep, const Step& pitchStep,
-                          const Step& velocityStep, const Step& modStep,
-                          const BlockTiming& timing, MidiEventSink& sink,
-                          NoteTracker& notes) noexcept
+void Sequencer::emitStep (const Lane& lane, LaneRuntime& rt, double startPpq,
+                          const BlockTiming& timing, MidiEventSink& sink) noexcept
 {
-    const auto& settings = patternData.lanes[static_cast<std::size_t> (laneIndex)].settings;
-    auto& rt = runtime[static_cast<std::size_t> (laneIndex)];
+    const auto& settings = lane.settings;
+
+    const auto channel = clampChannel (settings.midiChannel);
+    const auto offset = timing.sampleOffsetForPpq (startPpq);
+    const auto stepPpq = settings.clock.stepPpq();
+
+    // The walkers still point at this step, so the four sub-lanes are read here.
+    const auto& triggerStep = stepAt (lane, rt.gateWalk.current());
+    const auto& pitchStep = stepAt (lane, rt.pitchWalk.current());
+    const auto& velocityStep = stepAt (lane, rt.velocityWalk.current());
+    const auto& modStep = stepAt (lane, rt.modWalk.current());
 
     if (settings.type == LaneType::cc)
     {
         sink.addController (channel,
                             juce::jlimit (0, 127, settings.modController),
                             juce::jlimit (0, 127, static_cast<int> (modStep.mod)),
-                            sampleOffset);
+                            offset);
         return;
     }
 
-    const auto mask = settings.useGlobalScale
-                        ? math::scaleMask (patternData.globalScale, patternData.customScaleMask)
-                        : math::scaleMask (settings.scale, patternData.customScaleMask);
+    const auto mask = math::scaleMask (settings.useGlobalScale ? patternData.globalScale
+                                                               : settings.scale,
+                                       patternData.customScaleMask);
     const auto root = settings.useGlobalScale ? patternData.globalRoot : settings.scaleRoot;
 
     const auto note = juce::jlimit (0, 127,
@@ -417,44 +333,41 @@ void Sequencer::emitStep (int laneIndex, int channel, double startPpq, int sampl
         sink.addController (channel,
                             juce::jlimit (0, 127, settings.accentCC),
                             juce::jlimit (0, 127, settings.accentCCValue),
-                            sampleOffset);
+                            offset);
     }
 
-    const bool slideActive = triggerStep.slide && rt.lastNote >= 0;
+    const bool sliding = triggerStep.slide && rt.lastNote >= 0;
 
     // Slide, mode 3: keep the held note and bend its pitch instead of retriggering.
-    if (slideActive && settings.slideMode == SlideMode::pitchBendRamp)
+    if (sliding && settings.slideMode == SlideMode::pitchBendRamp)
     {
         rt.bendFrom = rt.currentBend;
         rt.bendTo = bendValue (static_cast<double> (note - rt.baseNote),
                                settings.bendRangeSemitones);
         rt.bendStartPpq = startPpq;
         rt.bendEndPpq = startPpq + stepPpq;
-        rt.bendEmittedPpq = startPpq;
         rt.bendActive = true;
         rt.lastNote = note;
 
-        sink.add (juce::MidiMessage::pitchWheel (channel, rt.currentBend), sampleOffset);
+        sink.add (juce::MidiMessage::pitchWheel (channel, rt.currentBend), offset);
         return;
     }
 
     // Slide, mode 2: hand the glide to the synth's portamento.
     if (settings.slideMode == SlideMode::portamentoCC65)
-        sink.addController (channel, 65, slideActive ? 127 : 0, sampleOffset);
+        sink.addController (channel, 65, sliding ? 127 : 0, offset);
 
     const auto overlapPpq = (settings.slideOverlapMs / 1000.0) * (timing.bpm / 60.0);
 
     // Slide, mode 1: let the previous note ring past this step's note-on.
-    if (slideActive && settings.slideMode == SlideMode::legatoOverlap)
-        extendPendingOff (rt, channel, rt.lastNote, startPpq + overlapPpq);
+    if (sliding && settings.slideMode == SlideMode::legatoOverlap)
+        extendRelease (rt, channel, rt.lastNote, startPpq + overlapPpq);
 
-    // Overlap has to be decided when the off is *scheduled*: by the time the next step fires,
-    // this note's off may already have been emitted. Look ahead instead.
-    const auto gateLength = juce::jlimit (1, maxSteps, settings.gateLength);
-    const auto nextStepIndex = rt.gateWalk.peekNext (gateLength, settings.direction);
+    // The overlap has to be applied when the release is *stored*: by the time the next step
+    // fires, this note's release may already have been emitted. Look ahead instead.
     const auto nextSlides = settings.slideMode == SlideMode::legatoOverlap
-                              && patternData.lanes[static_cast<std::size_t> (laneIndex)]
-                                     .steps[static_cast<std::size_t> (nextStepIndex)].slide;
+                              && stepAt (lane, rt.gateWalk.peekNext (clampLength (settings.gateLength),
+                                                                    settings.direction)).slide;
 
     const auto ratchets = juce::jlimit (1, 8, static_cast<int> (triggerStep.ratchets));
     const auto ratchetPpq = stepPpq / static_cast<double> (ratchets);
@@ -463,7 +376,7 @@ void Sequencer::emitStep (int laneIndex, int channel, double startPpq, int sampl
 
     if (rt.currentBend != 8192)
     {
-        sink.add (juce::MidiMessage::pitchWheel (channel, 8192), sampleOffset);
+        sink.add (juce::MidiMessage::pitchWheel (channel, 8192), offset);
         rt.currentBend = 8192;
     }
 
@@ -477,10 +390,9 @@ void Sequencer::emitStep (int laneIndex, int channel, double startPpq, int sampl
         if (nextSlides && r == ratchets - 1)
             offPpq = startPpq + stepPpq + overlapPpq;
 
-        // Queued rather than emitted: sub-triggers of a long step land in later blocks, and a
-        // clamped offset would both mis-time them and make the tracker suppress the re-trigger.
-        queueNoteOn (rt, channel, note, juce::jlimit (0.0f, 1.0f, velocity * gain),
-                     subStart, offPpq, timing, sink, notes);
+        // Scheduled, not emitted: sub-triggers of a long step belong to later blocks, and a
+        // clamped offset would both mis-time them and make the tracker swallow the retrigger.
+        queueNote (rt, channel, note, juce::jlimit (0.0f, 1.0f, velocity * gain), subStart, offPpq);
     }
 
     rt.lastNote = note;
