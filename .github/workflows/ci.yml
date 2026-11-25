@@ -1,0 +1,143 @@
+name: CI
+
+# Builds both configurations on every push to main and every pull request, runs the
+# timing-engine tests and validates the AU with auval.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CONFIG: Release
+  JUCE_TAG: 8.0.15
+
+jobs:
+  build-and-validate:
+    name: ${{ matrix.arch }} (${{ matrix.label }})
+    # macos-15 is the arm64 image: the arm64 slice runs natively in both configurations, and
+    # the universal job also runs the x86_64 slice under Rosetta when the runner has it.
+    # (macos-14 is the deprecated x64 image; macos-latest tracks the newest OS.)
+    runs-on: macos-15
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            label: native Apple Silicon
+          - arch: universal
+            label: arm64 + x86_64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache JUCE ${{ env.JUCE_TAG }}
+        uses: actions/cache@v6
+        with:
+          path: external/JUCE
+          key: juce-${{ runner.os }}-${{ runner.arch }}-${{ env.JUCE_TAG }}
+
+      - name: Bootstrap JUCE
+        run: bash Scripts/bootstrap.sh
+
+      - name: Build ${{ matrix.arch }}
+        run: bash Scripts/build.sh "${CONFIG}" ${{ matrix.arch }}
+
+      - name: Verify Universal slices
+        if: matrix.arch == 'universal'
+        run: |
+          set -euo pipefail
+          BUILD_DIR="build/${CONFIG}-universal"
+          COMPONENT="$(find "${BUILD_DIR}" -maxdepth 4 -name KINETIC.component -print -quit)"
+          VST3="$(find "${BUILD_DIR}" -maxdepth 4 -name KINETIC.vst3 -print -quit)"
+          TEST_BIN="$(find "${BUILD_DIR}" -maxdepth 4 -type f -name kinetic_timing_tests -print -quit)"
+
+          # Every binary carries both slices; a silently thinned build still passes the tests.
+          for binary in "${COMPONENT}/Contents/MacOS/KINETIC" \
+                        "${VST3}/Contents/MacOS/KINETIC" \
+                        "${TEST_BIN}"; do
+            archs="$(lipo -archs "${binary}")"
+            echo "${binary}: ${archs}"
+            case "${archs}" in
+              *arm64*x86_64*|*x86_64*arm64*) ;;
+              *) echo "::error::${binary} is not Universal (${archs})"; exit 1 ;;
+            esac
+          done
+
+          # Both slices keep the 11.0 deployment floor.
+          minos="$(vtool -show-build "${TEST_BIN}" | awk '/minos/ { print $2 }' | sort -u | paste -sd' ' -)"
+          echo "minos: ${minos}"
+          [[ "${minos}" == "11.0" ]] || { echo "::error::expected minos 11.0, got '${minos}'"; exit 1; }
+
+      - name: Run timing-engine tests (${{ matrix.arch }})
+        run: |
+          set -euo pipefail
+          ARCH=${{ matrix.arch }}
+          TEST_BIN="$(find "build/${CONFIG}-${ARCH}" -maxdepth 4 -type f \
+                        -name kinetic_timing_tests -print -quit)"
+          [[ -n "${TEST_BIN}" ]] || { echo "::error::kinetic_timing_tests was not built"; exit 1; }
+
+          # Redirect, then cat: the tested command's own status is what fails the step.
+          run_tests () {
+            local label="$1"
+            shift
+            set +e
+            "$@" > "test-${label}.log" 2>&1
+            local status=$?
+            set -e
+            cat "test-${label}.log"
+            return "${status}"
+          }
+
+          echo "Running ${TEST_BIN} ($(lipo -archs "${TEST_BIN}"))"
+          run_tests "${ARCH}" "${TEST_BIN}"
+
+          # The universal job also proves the Intel slice runs, where Rosetta is installed.
+          if [[ "${ARCH}" == "universal" ]]; then
+            if arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+              run_tests "${ARCH}-x86_64" arch -x86_64 "${TEST_BIN}"
+            else
+              echo "::notice::Rosetta 2 unavailable; the x86_64 slice was verified structurally only."
+            fi
+          fi
+
+      - name: Validate AU with auval (${{ matrix.arch }})
+        run: |
+          set -euo pipefail
+          ARCH=${{ matrix.arch }}
+          log="auval-${ARCH}.log"
+
+          # A fresh runner's component registry can lag the install, so retry before failing.
+          ok=false
+          for attempt in 1 2 3; do
+            if bash Scripts/validate-au.sh "${CONFIG}" "${ARCH}" > "${log}" 2>&1; then
+              ok=true
+              break
+            fi
+            echo "::warning::auval attempt ${attempt} failed"
+            killall -9 AudioComponentRegistrar 2>/dev/null || true
+            sleep 3
+          done
+
+          cat "${log}"
+          [[ "${ok}" == true ]] || { echo "::error::auval failed for the ${ARCH} build"; exit 1; }
+          echo "auval succeeded"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs-${{ matrix.arch }}
+          path: |
+            test-*.log
+            auval-*.log
+          if-no-files-found: ignore
+          retention-days: 7
