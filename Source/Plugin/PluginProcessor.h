@@ -61,7 +61,7 @@ public:
         std::atomic<double> tempoBpm { 120.0 };
         std::atomic<bool>   isPlaying { false };
         std::atomic<int>    activeNotes { 0 };
-        std::atomic<int>    generatedEvents { 0 };
+        std::atomic<int>    generatedSinceStart { 0 };   // restarts with the transport
         std::atomic<int>    droppedEvents { 0 };
     };
 

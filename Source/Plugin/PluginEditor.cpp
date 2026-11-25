@@ -77,7 +77,7 @@ juce::String KineticAudioProcessorEditor::transportLine() const
     const auto bpm = view.tempoBpm.load (std::memory_order_relaxed);
     const auto playing = view.isPlaying.load (std::memory_order_relaxed);
     const auto held = view.activeNotes.load (std::memory_order_relaxed);
-    const auto generated = view.generatedEvents.load (std::memory_order_relaxed);
+    const auto generated = view.generatedSinceStart.load (std::memory_order_relaxed);
     const auto dropped = view.droppedEvents.load (std::memory_order_relaxed);
 
     juce::String line;

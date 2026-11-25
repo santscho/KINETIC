@@ -47,6 +47,7 @@ void KineticAudioProcessor::prepareToPlay (double sampleRate, int maximumExpecte
     transportView.ppqPosition.store (0.0, std::memory_order_relaxed);
     transportView.isPlaying.store (false, std::memory_order_relaxed);
     transportView.activeNotes.store (0, std::memory_order_relaxed);
+    transportView.generatedSinceStart.store (0, std::memory_order_relaxed);
 }
 
 bool KineticAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -93,11 +94,21 @@ void KineticAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 void KineticAudioProcessor::publishTelemetry (const kinetic::BlockTiming& timing) noexcept
 {
+    const auto generatedThisBlock = engine.events().size();
+
+    // The footer counts the events of the whole run rather than of one block: a block only
+    // carries events on step boundaries, so a per-block sample reads zero almost all the time
+    // and says nothing about whether the sequencer is producing. The count restarts when the
+    // transport starts, so it always describes the run the user is looking at.
+    if (timing.didStart)
+        transportView.generatedSinceStart.store (generatedThisBlock, std::memory_order_relaxed);
+    else if (timing.isPlaying)
+        transportView.generatedSinceStart.fetch_add (generatedThisBlock, std::memory_order_relaxed);
+
     transportView.ppqPosition.store (timing.blockStartPpq, std::memory_order_relaxed);
     transportView.tempoBpm.store (timing.bpm, std::memory_order_relaxed);
     transportView.isPlaying.store (timing.isPlaying, std::memory_order_relaxed);
     transportView.activeNotes.store (engine.activeNoteCount(), std::memory_order_relaxed);
-    transportView.generatedEvents.store (engine.events().size(), std::memory_order_relaxed);
     transportView.droppedEvents.store (engine.events().droppedCount(), std::memory_order_relaxed);
 }
 
