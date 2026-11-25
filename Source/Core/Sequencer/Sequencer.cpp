@@ -222,6 +222,14 @@ void Sequencer::processBlock (const BlockTiming& timing, MidiEventSink& sink,
         const auto& lane = current().lanes[i];
         const bool stepsAllowed = lane.settings.enabled;
 
+        // A lane switched on while the transport already runs joins at the current position.
+        // Its step cursor sat frozen where it stopped, so replaying from there would fire every
+        // missed step at sample offset 0 and arrive as one burst. A cursor that is still ahead
+        // of the block is left alone: that step has not been missed yet.
+        if (stepsAllowed && ! rt.enabled && ! timing.didStart && ! timing.didJump
+             && rt.nextStepPpq < timing.blockStartPpq)
+            rt.nextStepPpq = timing.blockStartPpq;
+
         // One timeline per lane: scheduled notes and step boundaries, whichever is next.
         for (int guard = 0; guard < 8192; ++guard)
         {
@@ -244,6 +252,8 @@ void Sequencer::processBlock (const BlockTiming& timing, MidiEventSink& sink,
                 fireStep (lane, rt, rt.nextStepPpq, timing, sink);
             }
         }
+
+        rt.enabled = stepsAllowed;
     }
 
     // Flushed last: a ramp that started part-way through this block still gets its messages,

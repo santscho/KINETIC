@@ -756,6 +756,34 @@ public:
             expectEquals (countNoteOffs (events), 1);           // flushed, not stranded
         }
 
+        beginTest ("Enabling a lane mid-playback starts at the current position");
+        {
+            Rig rig;
+            auto& lane = setupLane (rig.pattern(), 0, 4, { 1, 16, ClockModifier::straight });
+            lane.settings.enabled = false;
+
+            // A whole quarter note with the lane off, so four steps went by unplayed.
+            expectEquals (countNoteOns (rig.run (1.0)), 0);
+
+            lane.settings.enabled = true;
+
+            const auto events = rig.block (4800);       // 0.1 PPQ: less than one step
+            expectEquals (countNoteOns (events), 1);    // joined, not the four it missed
+
+            int firstOn = -1;
+            for (const auto& event : events)
+                if (event.message.isNoteOn())
+                {
+                    firstOn = event.samplePosition;
+                    break;
+                }
+
+            expectEquals (firstOn, 0);                  // at the current position, not stacked
+
+            // And it keeps time from there rather than carrying the backlog forward.
+            expectEquals (countNoteOns (rig.run (1.0)), 4);
+        }
+
         beginTest ("An adopted pattern is played by reference, not copied");
         {
             Rig rig;

@@ -87,6 +87,7 @@ private:
 
         long long tick = 0;
         double nextStepPpq = 0.0;
+        bool enabled = false;   // last enable state the audio thread saw, for joining late
 
         std::array<PendingNote, maxPendingNotes> pending {};
 
