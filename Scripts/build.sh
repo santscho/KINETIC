@@ -27,8 +27,11 @@ esac
 
 BUILD_DIR="${ROOT}/build/${CONFIG}-${TARGET_ARCH}"
 
+# Every build signs and installs both formats for the local host scans; CI has no host to
+# serve, so it sets KINETIC_INSTALL_PLUGINS=OFF in the environment.
 cmake -S "${ROOT}" -B "${BUILD_DIR}" \
     -DCMAKE_BUILD_TYPE="${CONFIG}" \
+    -DKINETIC_INSTALL_PLUGINS="${KINETIC_INSTALL_PLUGINS:-ON}" \
     "${ARCH_ARGS[@]}"
 
 cmake --build "${BUILD_DIR}" --config "${CONFIG}" -j "$(sysctl -n hw.ncpu)"

@@ -63,6 +63,10 @@ option (KINETIC_COPY_PLUGINS
         "Copy the built plug-ins into the user plug-in folders as a post-build step"
         OFF)
 
+option (KINETIC_INSTALL_PLUGINS
+        "Sign the built AU and VST3 and install them into the user plug-in folders after every build"
+        ON)
+
 option (KINETIC_BUILD_TESTS
         "Build the timing-engine test binary"
         ON)
@@ -134,4 +138,4 @@ endif()
 
 #-------------------------------------------------------------------------------
 message (STATUS "KINETIC ${PROJECT_VERSION} | macOS >= ${CMAKE_OSX_DEPLOYMENT_TARGET} | arch: ${CMAKE_OSX_ARCHITECTURES} | universal: ${KINETIC_UNIVERSAL}")
-message (STATUS "KINETIC targets: KINETIC_AU (aumi), KINETIC_VST3 | tests: ${KINETIC_BUILD_TESTS}")
+message (STATUS "KINETIC targets: KINETIC_AU (aumi), KINETIC_VST3 | tests: ${KINETIC_BUILD_TESTS} | install plug-ins: ${KINETIC_INSTALL_PLUGINS}")

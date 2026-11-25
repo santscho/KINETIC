@@ -97,6 +97,29 @@ function (kinetic_add_plugin_target)
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+    # Both formats are signed and installed into the per-user plug-in folder after the bundle is
+    # built. This runs after JUCE's own post-build commands on the format sub-target, which for
+    # the VST3 matters: JUCE signs the bundle and then writes moduleinfo.json, invalidating the
+    # seal. Re-signing there is what makes the installed bundle verify.
+    if (KINETIC_INSTALL_PLUGINS)
+        if (ARG_FORMAT STREQUAL "VST3")
+            set (_kinetic_install_dir "$ENV{HOME}/Library/Audio/Plug-Ins/VST3")
+        elseif (ARG_FORMAT STREQUAL "AU")
+            set (_kinetic_install_dir "$ENV{HOME}/Library/Audio/Plug-Ins/Components")
+        else()
+            set (_kinetic_install_dir "")
+        endif()
+
+        if (_kinetic_install_dir AND TARGET "${ARG_TARGET}_${ARG_FORMAT}")
+            add_custom_command (TARGET "${ARG_TARGET}_${ARG_FORMAT}" POST_BUILD
+                COMMAND "${PROJECT_SOURCE_DIR}/Scripts/install-plugin.sh"
+                        "$<TARGET_BUNDLE_DIR:${ARG_TARGET}_${ARG_FORMAT}>"
+                        "${_kinetic_install_dir}"
+                COMMENT "Signing and installing ${ARG_TARGET} into ${_kinetic_install_dir}"
+                VERBATIM)
+        endif()
+    endif()
 endfunction()
 
 # kinetic_add_test_target (TARGET <name> SOURCES <files>...)

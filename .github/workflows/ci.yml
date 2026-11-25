@@ -19,6 +19,8 @@ permissions:
 env:
   CONFIG: Release
   JUCE_TAG: 8.0.15
+  # Runners have no host to scan; the local install-and-sign step is for developer machines.
+  KINETIC_INSTALL_PLUGINS: OFF
 
 jobs:
   build-and-validate:
