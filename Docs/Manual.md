@@ -116,8 +116,9 @@ The badge on the right shows the format the instance was built as (`AU MIDI FX` 
 with the session.
 
 `ON` / `OFF` enables or disables the lane being edited. **A disabled lane never sounds**, and its
-step position does not advance while it is off; switching it back on resumes from the step it
-stopped at.
+step position does not advance while it is off. Switching it back on while the transport is
+running joins at the current position and carries on from the step it stopped at; the steps that
+went by while it was off are skipped, not replayed.
 
 ### 4.3 Lane controls
 
