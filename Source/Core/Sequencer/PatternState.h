@@ -113,12 +113,22 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
     }
 }
 
-/** Restores a pattern written by writeToXml(). False when `parent` holds no pattern. */
+/**
+    Restores a pattern written by writeToXml(). False when `parent` holds no pattern, or holds one
+    written in a format version this build does not understand; in both cases `pattern` and
+    `selectedLane` are left untouched.
+*/
 inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& selectedLane)
 {
     const auto* element = parent.getChildByName (elementTag);
 
     if (element == nullptr)
+        return false;
+
+    // States written before the attribute existed are format 1. Anything else is refused rather
+    // than parsed on a guess: a future format may move or reinterpret fields, and misreading them
+    // would silently change how the session sounds.
+    if (element->getIntAttribute ("format", formatVersion) != formatVersion)
         return false;
 
     // A restore replaces the pattern outright, so a lane the file does not mention stays silent

@@ -18,6 +18,8 @@ public:
         testMissingPatternIsIgnored();
         testSelectedLaneSurvives();
         testSurvivesTheTextForm();
+        testUnknownFormatIsRefused();
+        testMissingFormatAttributeIsVersionOne();
     }
 
 private:
@@ -255,6 +257,58 @@ private:
             expect (patternsMatch (original, restored));
             expectEquals (selectedLane, 1);
         }
+    }
+
+    void testUnknownFormatIsRefused()
+    {
+        beginTest ("A pattern from an unknown format version is refused, not misread");
+
+        juce::XmlElement state ("KINETIC_STATE");
+        patternstate::writeToXml (makeBusyPattern(), 4, state);
+
+        auto* element = state.getChildByName (patternstate::elementTag);
+        expect (element != nullptr);
+
+        if (element == nullptr)
+            return;
+
+        element->setAttribute ("format", patternstate::formatVersion + 1);
+
+        // Whatever this session holds must survive a refused load untouched.
+        auto working = makeBusyPattern();
+        working.lanes[2].settings.gateLength = 9;
+        working.globalRoot = 7;
+        const auto before = working;
+        int selectedLane = 2;
+
+        expect (! patternstate::readFromXml (state, working, selectedLane));
+        expect (patternsMatch (before, working));
+        expectEquals (selectedLane, 2);
+    }
+
+    void testMissingFormatAttributeIsVersionOne()
+    {
+        beginTest ("A pattern without a format attribute is read as version 1");
+
+        const auto original = makeBusyPattern();
+
+        juce::XmlElement state ("KINETIC_STATE");
+        patternstate::writeToXml (original, 6, state);
+
+        auto* element = state.getChildByName (patternstate::elementTag);
+        expect (element != nullptr);
+
+        if (element == nullptr)
+            return;
+
+        element->removeAttribute ("format");
+
+        Pattern restored;
+        int selectedLane = 0;
+
+        expect (patternstate::readFromXml (state, restored, selectedLane));
+        expect (patternsMatch (original, restored));
+        expectEquals (selectedLane, 6);
     }
 };
 
