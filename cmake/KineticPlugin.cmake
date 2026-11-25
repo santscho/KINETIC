@@ -15,7 +15,11 @@ set (KINETIC_CORE_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/HostClock.cpp"
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/MidiEventSink.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/NoteTracker.h"
-    "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h")
+    "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SequencerTypes.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SequenceMath.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.cpp")
 
 set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h"

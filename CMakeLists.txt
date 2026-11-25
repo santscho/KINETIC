@@ -16,7 +16,7 @@
 cmake_minimum_required (VERSION 3.22)
 
 project (KINETIC
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "KINETIC - sample-accurate pure MIDI FX sequencer"
     LANGUAGES C CXX OBJC OBJCXX)
 
@@ -121,7 +121,8 @@ if (KINETIC_BUILD_TESTS)
         TARGET  kinetic_timing_tests
         SOURCES ${KINETIC_CORE_SOURCES}
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TestMain.cpp"
-                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TimingEngineTests.cpp")
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TimingEngineTests.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SequencerTests.cpp")
 endif()
 
 #-------------------------------------------------------------------------------

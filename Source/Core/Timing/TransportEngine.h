@@ -4,6 +4,8 @@
 #include "MidiEventSink.h"
 #include "NoteTracker.h"
 
+#include "Sequencer/Sequencer.h"
+
 #include <atomic>
 
 namespace kinetic
@@ -29,6 +31,7 @@ public:
     {
         clock.prepare (sampleRate, maximumBlockSize);
         noteTracker.prepare (sampleRate);
+        sequencerEngine.prepare (sampleRate);
         sink.reset (maximumBlockSize);
         commands.clear();
     }
@@ -37,6 +40,7 @@ public:
     {
         clock.reset();
         noteTracker.reset();
+        sequencerEngine.reset();
         sink.reset (1);
         commands.clear();
     }
@@ -73,12 +77,18 @@ public:
         if (block.didStop || block.didJump)
             noteTracker.panic (sink, 0);
 
+        // Generation happens after the flush, so a stop or locate can never leave a lane
+        // pointing at stale note-off state.
+        sequencerEngine.processBlock (block, sink, noteTracker);
+
         return block;
     }
 
     const BlockTiming& currentBlock() const noexcept { return block; }
     MidiEventSink& events() noexcept { return sink; }
     NoteTracker& notes() noexcept { return noteTracker; }
+    Sequencer& sequencer() noexcept { return sequencerEngine; }
+    const Sequencer& sequencer() const noexcept { return sequencerEngine; }
 
     void flushGeneratedMidi (juce::MidiBuffer& destination) noexcept
     {
@@ -91,6 +101,7 @@ private:
     HostClock clock;
     NoteTracker noteTracker;
     MidiEventSink sink;
+    Sequencer sequencerEngine;
     UiCommandQueue commands;
     BlockTiming block {};
 

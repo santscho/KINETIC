@@ -77,8 +77,8 @@ void KineticAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // locate or loop wrap - all inside the audio callback, before anything is generated.
     const auto& timing = engine.beginBlock (readTransportInput(), buffer.getNumSamples());
 
-    // Step 3 slots the sequencer here: it schedules into engine.events() using
-    // timing.sampleOffsetForPpq(), and the sink writes them into the host buffer below.
+    // beginBlock() already ran the sequencer against this block's timing; the generated
+    // events are waiting in the engine's sink.
 
     engine.flushGeneratedMidi (midiMessages);
 
