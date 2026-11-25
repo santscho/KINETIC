@@ -35,11 +35,26 @@ public:
     void prepare (double newSampleRate) noexcept;
     void reset() noexcept;
 
+    /** The internal pattern. Offline use and tests edit this directly. */
     Pattern& pattern() noexcept { return patternData; }
     const Pattern& pattern() const noexcept { return patternData; }
 
-    /** Audio thread only: swap in the pattern published by the editor. */
-    void setPattern (const Pattern& published) noexcept { patternData = published; }
+    /**
+        Audio thread only: play `published` by reference from the next block on.
+
+        Nothing is copied. `published` must stay valid until the next call, which is exactly
+        what SharedPattern guarantees for the slot it most recently handed out: that slot is
+        not returned to the writer until the reader exchanges again.
+
+        Passing nullptr goes back to the internal pattern.
+    */
+    void usePattern (const Pattern* published) noexcept { adoptedPattern = published; }
+
+    /** What the sequencer is reading: the adopted snapshot, or the internal pattern. */
+    const Pattern& current() const noexcept
+    {
+        return adoptedPattern != nullptr ? *adoptedPattern : patternData;
+    }
 
     /** Call once per block, after the transport engine has resolved its timing. */
     void processBlock (const BlockTiming& timing, MidiEventSink& sink, NoteTracker& notes) noexcept;
@@ -116,6 +131,7 @@ private:
 
     double sampleRate = 48000.0;
     Pattern patternData {};
+    const Pattern* adoptedPattern = nullptr;
     std::array<LaneRuntime, maxLanes> runtime {};    math::Rng rng;
 
     JUCE_DECLARE_NON_COPYABLE (Sequencer)

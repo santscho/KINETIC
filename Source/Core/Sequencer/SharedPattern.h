@@ -11,15 +11,20 @@ namespace kinetic
     Lock-free hand-off of the pattern being edited to the audio thread.
 
     The message thread edits its own private copy and publishes it; the audio thread takes the
-    newest publication once per block. Three slots and two index exchanges mean neither thread
-    can touch the buffer the other is using, so no lock, no allocation and no copy happens on
-    the audio thread:
+    newest publication once per block and plays it in place, so no lock, no allocation and no
+    copy of the pattern happens on the audio thread. Three slots and two index exchanges mean
+    neither thread can touch the buffer the other is using:
 
       - the writer only writes its own slot, then swaps it into `shared`,
       - the reader only ever swaps in whatever `shared` holds, which is fully written.
 
     A slot is therefore never both being written and being read, and a published pattern is
     always read whole rather than half-updated.
+
+    The reader may hold the slot takeLatest() returned for as long as it likes: that slot only
+    goes back to the writer after the reader exchanges again, so a pointer taken from here
+    stays valid until the next call. This is what lets the sequencer play the snapshot by
+    reference instead of copying it into the audio callback.
 
     `dirty` records whether anything was published since the reader last looked, so an
     unchanged pattern costs one atomic load per block.

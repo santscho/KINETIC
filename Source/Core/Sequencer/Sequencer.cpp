@@ -58,9 +58,11 @@ void Sequencer::reset() noexcept
 
 void Sequencer::resetLanePhases (const BlockTiming& timing) noexcept
 {
+    const auto& pattern = current();
+
     for (std::size_t i = 0; i < runtime.size(); ++i)
     {
-        const auto& settings = patternData.lanes[i].settings;
+        const auto& settings = pattern.lanes[i].settings;
         auto& rt = runtime[i];
 
         // Each sub-lane restarts at the head of each of its own loops.
@@ -173,7 +175,7 @@ void Sequencer::emitBendRamps (const BlockTiming& timing, MidiEventSink& sink) n
             continue;
         }
 
-        const auto channel = clampChannel (patternData.lanes[i].settings.midiChannel);
+        const auto channel = clampChannel (current().lanes[i].settings.midiChannel);
 
         const auto bendTo = [&] (double ppq, double t)
         {
@@ -217,7 +219,7 @@ void Sequencer::processBlock (const BlockTiming& timing, MidiEventSink& sink,
     for (std::size_t i = 0; i < runtime.size(); ++i)
     {
         auto& rt = runtime[i];
-        const auto& lane = patternData.lanes[i];
+        const auto& lane = current().lanes[i];
         const bool stepsAllowed = lane.settings.enabled;
 
         // One timeline per lane: scheduled notes and step boundaries, whichever is next.
@@ -292,6 +294,7 @@ void Sequencer::fireStep (const Lane& lane, LaneRuntime& rt, double stepStartPpq
 void Sequencer::emitStep (const Lane& lane, LaneRuntime& rt, double startPpq,
                           const BlockTiming& timing, MidiEventSink& sink) noexcept
 {
+    const auto& pattern = current();
     const auto& settings = lane.settings;
 
     const auto channel = clampChannel (settings.midiChannel);
@@ -313,10 +316,10 @@ void Sequencer::emitStep (const Lane& lane, LaneRuntime& rt, double startPpq,
         return;
     }
 
-    const auto mask = math::scaleMask (settings.useGlobalScale ? patternData.globalScale
+    const auto mask = math::scaleMask (settings.useGlobalScale ? pattern.globalScale
                                                                : settings.scale,
-                                       patternData.customScaleMask);
-    const auto root = settings.useGlobalScale ? patternData.globalRoot : settings.scaleRoot;
+                                       pattern.customScaleMask);
+    const auto root = settings.useGlobalScale ? pattern.globalRoot : settings.scaleRoot;
 
     const auto note = juce::jlimit (0, 127,
                                     math::quantise (settings.rootNote + static_cast<int> (pitchStep.pitch),

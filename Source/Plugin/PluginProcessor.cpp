@@ -74,8 +74,9 @@ void KineticAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     buffer.clear();
 
     // Adopt whatever the editor published since the last block, before anything is generated.
+    // The hand-off is a pointer swap: nothing is copied and nothing is allocated here.
     if (const auto* published = sharedPattern.takeLatest())
-        engine.setPattern (*published);
+        engine.usePattern (published);
 
     // Derives sample offsets from host PPQ and flushes any note left hanging by a stop,
     // locate or loop wrap - all inside the audio callback, before anything is generated.

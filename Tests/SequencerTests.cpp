@@ -755,6 +755,26 @@ public:
             const auto events = rig.run (4.5);
             expectEquals (countNoteOffs (events), 1);           // flushed, not stranded
         }
+
+        beginTest ("An adopted pattern is played by reference, not copied");
+        {
+            Rig rig;
+
+            Pattern external;
+            setupLane (external, 0, 4, { 1, 4, ClockModifier::straight });
+
+            // The internal pattern has no enabled lane, so any note can only come from
+            // `external`.
+            rig.engine.usePattern (&external);
+            expectEquals (countNoteOns (rig.run (0.9)), 1);
+
+            // Editing the adopted pattern in place is audible at once, which is only true if
+            // the sequencer reads it rather than a copy taken inside the callback.
+            for (auto& step : external.lanes[0].steps)
+                step.trigger = false;
+
+            expectEquals (countNoteOns (rig.run (4.0)), 0);
+        }
     }
 };
 static SequencerRenderTests sequencerRenderTests;

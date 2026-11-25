@@ -90,8 +90,8 @@ public:
     Sequencer& sequencer() noexcept { return sequencerEngine; }
     const Sequencer& sequencer() const noexcept { return sequencerEngine; }
 
-    /** Audio thread only: adopt the pattern the editor just published. */
-    void setPattern (const Pattern& published) noexcept { sequencerEngine.setPattern (published); }
+    /** Audio thread only: adopt the pattern the editor published, by reference. */
+    void usePattern (const Pattern* published) noexcept { sequencerEngine.usePattern (published); }
 
     void flushGeneratedMidi (juce::MidiBuffer& destination) noexcept
     {
