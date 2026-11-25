@@ -1,0 +1,73 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "arm64-release",
+      "displayName": "KINETIC arm64 / Release (default)",
+      "description": "Native Apple Silicon build.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/Release-arm64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_OSX_ARCHITECTURES": "arm64"
+      }
+    },
+    {
+      "name": "arm64-debug",
+      "displayName": "KINETIC arm64 / Debug",
+      "description": "Native Apple Silicon build with symbols.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/Debug-arm64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_OSX_ARCHITECTURES": "arm64"
+      }
+    },
+    {
+      "name": "universal-release",
+      "displayName": "KINETIC Universal (arm64 + x86_64) / Release",
+      "description": "Fat binary: Apple Silicon plus Intel slice, for distribution.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/Release-universal",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "KINETIC_UNIVERSAL": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "arm64-release",
+      "configurePreset": "arm64-release"
+    },
+    {
+      "name": "arm64-debug",
+      "configurePreset": "arm64-debug"
+    },
+    {
+      "name": "universal-release",
+      "configurePreset": "universal-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "arm64-release",
+      "configurePreset": "arm64-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "universal-release",
+      "configurePreset": "universal-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
