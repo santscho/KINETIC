@@ -18,13 +18,21 @@ namespace
     {
         return (pitch > 0 ? "+" : "") + juce::String (pitch);
     }
+
+    /** The strip along the bottom of a RATCH cell that switches the ratchet off. */
+    juce::Rectangle<float> ratchetClearStrip (juce::Rectangle<float> cell) noexcept
+    {
+        const auto height = juce::jmin (7.0f, cell.getHeight() * 0.34f);
+        return cell.withTop (cell.getBottom() - height).reduced (1.0f, 0.5f);
+    }
 } // namespace
 
 StepGrid::StepGrid (SharedPattern& sharedPattern)
     : shared (sharedPattern)
 {
     setOpaque (false);
-    setTooltip ("Click or drag: triggers and slides toggle, other rows follow the pointer height");
+    setTooltip ("Click or drag: triggers and slides toggle, other rows follow the pointer height, "
+                "the strip under a ratchet switches it off");
 }
 
 void StepGrid::setLane (int newLaneIndex)
@@ -227,7 +235,10 @@ void StepGrid::paint (juce::Graphics& g)
 
                 case ratchet:
                 {
-                    if (value.ratchets > 1)
+                    const auto hasRatchet = value.ratchets > 1;
+                    const auto strip = ratchetClearStrip (cell);
+
+                    if (hasRatchet)
                     {
                         g.setColour (theme::violet.withAlpha (dim));
                         g.fillRoundedRectangle (cell.reduced (1.0f), 2.5f);
@@ -236,10 +247,25 @@ void StepGrid::paint (juce::Graphics& g)
                         {
                             g.setColour (theme::background);
                             g.setFont (theme::mono (8.5f));
-                            g.drawText ("x" + juce::String ((int) value.ratchets), cell,
+                            g.drawText ("x" + juce::String ((int) value.ratchets),
+                                        cell.withTrimmedBottom (strip.getHeight()),
                                         juce::Justification::centred, false);
                         }
                     }
+
+                    // "Off" is one ratchet, which used to be the lowest eighth of the cell and
+                    // looked like nothing at all. The strip along the bottom is that target, and
+                    // the bar in it is the minus sign, drawn rather than typed so it stays
+                    // legible when cells are only a few pixels tall.
+                    g.setColour (hasRatchet ? theme::background.withAlpha (0.3f)
+                                            : theme::raised.brighter (0.12f).withAlpha (dim));
+                    g.fillRoundedRectangle (strip, 1.5f);
+
+                    g.setColour (hasRatchet ? theme::background.withAlpha (0.95f)
+                                            : theme::muted.withAlpha (dim * 0.85f));
+                    g.fillRect (strip.withSizeKeepingCentre (
+                        juce::jmin (strip.getWidth() * 0.6f, 11.0f),
+                        juce::jmax (1.0f, std::round (strip.getHeight() * 0.2f))));
                     break;
                 }
 
@@ -292,7 +318,15 @@ void StepGrid::applyGesture (const juce::MouseEvent& e, bool firstOfGesture)
         case velocity: value.velocity = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
         case mod:      value.mod = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
         case gate:     value.gatePercent = static_cast<juce::uint8> (std::lround (2.0 + t * 98.0)); break;
-        case ratchet:  value.ratchets = static_cast<juce::uint8> (juce::jlimit (1, 8, 1 + (int) std::floor (t * 8.0))); break;
+        case ratchet:
+        {
+            const auto strip = ratchetClearStrip (cellBounds (ratchet, step));
+
+            value.ratchets = strip.contains (e.position)
+                               ? 1
+                               : static_cast<juce::uint8> (juce::jlimit (1, 8, 1 + (int) std::floor (t * 8.0)));
+            break;
+        }
         default:       return;
     }
 
