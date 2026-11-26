@@ -30,19 +30,20 @@ public:
 
 private:
     /**
-        Root note of the lane: the twelve notes of the octave the note is in, with buttons on the
-        left that move it one octave at a time.
+        Root note of the lane: a list of the twelve notes from C1 to B1 picks the note, and the
+        buttons on its left move the note's octave, which the readout beside the list shows.
     */
     class RootNoteSelector final : public juce::Component
     {
     public:
         RootNoteSelector();
 
+        void paint (juce::Graphics&) override;
         void resized() override;
 
         std::function<void (int)> onNoteChange;
 
-        /** Sets the note without notifying; the list follows the note's octave. */
+        /** Sets the note without notifying. The list always shows C1 to B1. */
         void setNote (int newNote);
 
     private:
@@ -51,6 +52,7 @@ private:
 
         juce::TextButton downButton { "-" }, upButton { "+" };
         juce::ComboBox noteBox;
+        juce::Rectangle<int> octaveArea;
         int note = 60;
     };
 

@@ -208,7 +208,7 @@ void PatternEditor::resized()
     controls.removeFromLeft (10);
     directionBox.setBounds (controls.removeFromLeft (136));
     controls.removeFromLeft (10);
-    rootNoteSelector.setBounds (controls.removeFromLeft (124));
+    rootNoteSelector.setBounds (controls.removeFromLeft (168));
 
     area.removeFromTop (8);
     grid.setBounds (area);
@@ -225,13 +225,14 @@ PatternEditor::RootNoteSelector::RootNoteSelector()
     addAndMakeVisible (downButton);
     addAndMakeVisible (upButton);
 
-    noteBox.setTooltip ("Root note of this lane, within the current octave");
+    noteBox.setTooltip ("Root note of this lane, C1 to B1; the buttons set its octave");
     noteBox.onChange = [this]
     {
         const auto base = note - (note % 12);
         const auto selected = juce::jlimit (0, 11, noteBox.getSelectedId() - 1);
 
         note = juce::jlimit (0, 127, base + selected);
+        repaint();
 
         if (onNoteChange != nullptr)
             onNoteChange (note);
@@ -241,13 +242,29 @@ PatternEditor::RootNoteSelector::RootNoteSelector()
     rebuildItems();
 }
 
+void PatternEditor::RootNoteSelector::paint (juce::Graphics& g)
+{
+    if (octaveArea.isEmpty())
+        return;
+
+    g.setColour (theme::raised);
+    g.fillRoundedRectangle (octaveArea.toFloat(), 3.0f);
+
+    g.setColour (theme::text);
+    g.setFont (theme::mono (10.0f));
+    g.drawText ("OCT " + juce::String (note / 12 - 2), octaveArea,
+                juce::Justification::centred, false);
+}
+
 void PatternEditor::RootNoteSelector::resized()
 {
     auto area = getLocalBounds();
-    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 5);
+    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 6);
 
     downButton.setBounds (area.removeFromLeft (buttonWidth).reduced (0, 1));
     upButton.setBounds (area.removeFromLeft (buttonWidth).reduced (1, 1));
+
+    octaveArea = area.removeFromRight (46).reduced (2, 1);
     noteBox.setBounds (area.reduced (2, 0));
 }
 
@@ -259,23 +276,25 @@ void PatternEditor::RootNoteSelector::setNote (int newNote)
 
 void PatternEditor::RootNoteSelector::rebuildItems()
 {
-    // One octave wide, starting on the C of the octave the note is in, so `+` on C1 relabels the
-    // same twelve entries as C2 and `+` again gives C3.
-    const auto base = note - (note % 12);
-
+    // The list is always C1 to B1. The octave is not part of the entries: the buttons move it and
+    // the readout next to the list shows it, so a root of C3 reads `C1` with `OCT 3`.
     noteBox.clear (juce::dontSendNotification);
 
     for (int i = 0; i < 12; ++i)
-        noteBox.addItem (noteName (base + i), i + 1);
+        noteBox.addItem (noteName (36 + i), i + 1);
 
     noteBox.setSelectedId ((note % 12) + 1, juce::dontSendNotification);
+
+    repaint();
 }
 
 void PatternEditor::RootNoteSelector::shiftOctave (int direction)
 {
-    const auto shifted = juce::jlimit (0, 127, note + 12 * direction);
+    // Refused rather than clamped at the ends: clamping would move the note off its letter, so
+    // C8 would turn into G8 when there is no C9.
+    const auto shifted = note + 12 * direction;
 
-    if (shifted == note)
+    if (shifted < 0 || shifted > 127)
         return;
 
     note = shifted;

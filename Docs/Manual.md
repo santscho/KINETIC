@@ -93,7 +93,7 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 ┌──────────────────────────────────────────────────────────────┐
 │ KINETIC                                              [ VST3 ] │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
-│ Loop length [ 16 ]   1/16 ▾   STRAIGHT ▾   FORWARD ▾  − + C3 ▾ │
+│ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾ − + C1 ▾ OCT 3 │
 │  1   2   3   4   5   6   7   8   9  10 …                      │
 │ TRIG  █       █                                               │
 │ PITCH                                                         │
@@ -132,7 +132,7 @@ say the same as the table below.
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
-| Root note (`−` `+` then the note) | 0–127, default 60 | The lane's root note. The list holds the twelve notes of the octave the note is in, starting on its C; `+` and `−` move the note one octave up or down. |
+| Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The lane's root note. The list always holds `C1` to `B1`; `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
 
 Step duration in quarter notes is `4 × numerator / denominator`, scaled by the modifier:
 `1/16` = 0.25, `1/4` = 1.0, `1/64` = 0.0625.
