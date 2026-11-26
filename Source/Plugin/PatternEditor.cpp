@@ -12,6 +12,15 @@ namespace
 
     const juce::StringArray directionNames { "FORWARD", "REVERSE", "PING-PONG",
                                              "PENDULUM", "RANDOM WALK" };
+
+    // C3 is note 60, the naming the manual and every host use.
+    juce::String noteName (int note)
+    {
+        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F",
+                                             "F#", "G", "G#", "A", "A#", "B" };
+
+        return juce::String (names[note % 12]) + juce::String (note / 12 - 2);
+    }
 } // namespace
 
 PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& selectedLaneRef)
@@ -102,6 +111,13 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
     };
     addAndMakeVisible (directionBox);
 
+    rootNoteSelector.onNoteChange = [this] (int note)
+    {
+        currentLane().settings.rootNote = note;
+        commit();
+    };
+    addAndMakeVisible (rootNoteSelector);
+
     // A pattern with no enabled lane is silent, so open on something that can play.
     bool anyEnabled = false;
 
@@ -161,6 +177,7 @@ void PatternEditor::refreshControls()
 
     modifierBox.setSelectedId (modifierId, juce::dontSendNotification);
     directionBox.setSelectedId (static_cast<int> (settings.direction) + 1, juce::dontSendNotification);
+    rootNoteSelector.setNote (settings.rootNote);
 }
 
 void PatternEditor::commit()
@@ -190,9 +207,82 @@ void PatternEditor::resized()
     modifierBox.setBounds (controls.removeFromLeft (104));
     controls.removeFromLeft (10);
     directionBox.setBounds (controls.removeFromLeft (136));
+    controls.removeFromLeft (10);
+    rootNoteSelector.setBounds (controls.removeFromLeft (124));
 
     area.removeFromTop (8);
     grid.setBounds (area);
+}
+
+PatternEditor::RootNoteSelector::RootNoteSelector()
+{
+    downButton.setTooltip ("Root note one octave down");
+    upButton.setTooltip ("Root note one octave up");
+
+    downButton.onClick = [this] { shiftOctave (-1); };
+    upButton.onClick = [this] { shiftOctave (1); };
+
+    addAndMakeVisible (downButton);
+    addAndMakeVisible (upButton);
+
+    noteBox.setTooltip ("Root note of this lane, within the current octave");
+    noteBox.onChange = [this]
+    {
+        const auto base = note - (note % 12);
+        const auto selected = juce::jlimit (0, 11, noteBox.getSelectedId() - 1);
+
+        note = juce::jlimit (0, 127, base + selected);
+
+        if (onNoteChange != nullptr)
+            onNoteChange (note);
+    };
+    addAndMakeVisible (noteBox);
+
+    rebuildItems();
+}
+
+void PatternEditor::RootNoteSelector::resized()
+{
+    auto area = getLocalBounds();
+    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 5);
+
+    downButton.setBounds (area.removeFromLeft (buttonWidth).reduced (0, 1));
+    upButton.setBounds (area.removeFromLeft (buttonWidth).reduced (1, 1));
+    noteBox.setBounds (area.reduced (2, 0));
+}
+
+void PatternEditor::RootNoteSelector::setNote (int newNote)
+{
+    note = juce::jlimit (0, 127, newNote);
+    rebuildItems();
+}
+
+void PatternEditor::RootNoteSelector::rebuildItems()
+{
+    // One octave wide, starting on the C of the octave the note is in, so `+` on C1 relabels the
+    // same twelve entries as C2 and `+` again gives C3.
+    const auto base = note - (note % 12);
+
+    noteBox.clear (juce::dontSendNotification);
+
+    for (int i = 0; i < 12; ++i)
+        noteBox.addItem (noteName (base + i), i + 1);
+
+    noteBox.setSelectedId ((note % 12) + 1, juce::dontSendNotification);
+}
+
+void PatternEditor::RootNoteSelector::shiftOctave (int direction)
+{
+    const auto shifted = juce::jlimit (0, 127, note + 12 * direction);
+
+    if (shifted == note)
+        return;
+
+    note = shifted;
+    rebuildItems();
+
+    if (onNoteChange != nullptr)
+        onNoteChange (note);
 }
 
 } // namespace kinetic

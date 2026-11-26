@@ -93,7 +93,7 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 ┌──────────────────────────────────────────────────────────────┐
 │ KINETIC                                              [ VST3 ] │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
-│ Loop length [ 16 ]   1/16 ▾   STRAIGHT ▾   FORWARD ▾          │
+│ Loop length [ 16 ]   1/16 ▾   STRAIGHT ▾   FORWARD ▾  − + C3 ▾ │
 │  1   2   3   4   5   6   7   8   9  10 …                      │
 │ TRIG  █       █                                               │
 │ PITCH                                                         │
@@ -132,6 +132,7 @@ say the same as the table below.
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
+| Root note (`−` `+` then the note) | 0–127, default 60 | The lane's root note. The list holds the twelve notes of the octave the note is in, starting on its C; `+` and `−` move the note one octave up or down. |
 
 Step duration in quarter notes is `4 × numerator / denominator`, scaled by the modifier:
 `1/16` = 0.25, `1/4` = 1.0, `1/64` = 0.0625.
@@ -237,7 +238,9 @@ through the state format — but the editor has no controls for them in 0.5.0.
 
 ### 6.2 MIDI channel and root note
 
-Per lane, 1–16 (default 1) and 0–127 (default 60, i.e. C3 in Live/JUCE naming).
+Per lane, 1–16 (default 1) and 0–127 (default 60, i.e. C3 in Live/JUCE naming). The root note is
+set by the editor's note list and its `−`/`+` octave buttons (§4.3); the channel is still
+state-format only.
 
 ### 6.3 Scales
 
@@ -398,8 +401,8 @@ The AU can be validated with `auval -v aumi Kntk Kntc`.
 - The AU has no direct MIDI out in Ableton Live (an AU-format restriction, not a KINETIC one);
   use the VST3 there. In Logic, the AU is meant for the MIDI FX slot.
 - MIDI input is accepted for host compatibility but ignored.
-- Editor controls for lane type, channel, root note, scales, Euclidean generation, slide mode,
-  accent values and the non-trigger sub-lane lengths are not built yet (§6).
+- Editor controls for lane type, channel, scales, Euclidean generation, slide mode, accent values
+  and the non-trigger sub-lane lengths are not built yet (§6).
 - One pattern per instance; there are no pattern slots or chaining.
 - No undo/redo in the editor. Host undo does not cover pattern edits.
 - Tempo changes are followed from host PPQ, but there is no independent tempo setting.
