@@ -262,9 +262,17 @@ preset is a starting point and no session depends on a preset file still being t
 **Moving presets between machines.** `Export this preset…` writes the selected preset to a
 `.kineticpreset` file wherever you choose, and `Export folder…` writes the whole folder to one
 `.kineticset` archive. `Import presets…` takes either — several at once — and copies the presets
-into the folder. Importing never overwrites: a preset whose name is already there arrives as
-`<name> version`, then `<name> version 2`, and so on, and the dialog reports how many were
-imported and which files were refused. An archive is the same per-preset documents collected
+into the folder.
+
+A preset whose name is already in the folder follows the policy picked in the import submenu:
+
+| Policy | What happens to the existing preset |
+| --- | --- |
+| `Keep Both Presets` (default) | The imported one arrives as `<name> version`, then `<name> version 2`, and so on. |
+| `Replace Existing Presets` | The imported pattern replaces the existing one, which keeps its name and its file. Use this to refresh a preset that came from another machine. |
+| `Skip Existing Presets` | The name already there is left untouched and the imported one is dropped. |
+
+The dialog reports how many were imported, skipped and refused. An archive is the same per-preset documents collected
 under one `KINETIC_PRESETS` element, so a single preset can also be lifted out of one by hand.
 
 ---

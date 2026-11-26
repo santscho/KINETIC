@@ -91,21 +91,30 @@ public:
     juce::Result exportArchive (const juce::File& target,
                                 const juce::String& name = "KINETIC Presets") const;
 
+    /** What an import does with a preset whose name is already in the folder. */
+    enum class ImportPolicy
+    {
+        skip,           // leave the existing preset alone
+        keepBoth,       // bring the imported one in under "<name> version" (the default)
+        overwrite       // replace the existing preset's pattern, keeping its name and file
+    };
+
     /** What an import did, so the editor can report it. */
     struct ImportSummary
     {
         int imported = 0;
+        int skipped = 0;
         juce::StringArray failures;         // one line per source that could not be imported
     };
 
     /**
         Imports preset documents and folder archives, in any order.
 
-        A preset whose name is already in the folder is kept alongside the existing one under
-        "<name> version", "<name> version 2" and so on, so importing a set never overwrites
-        anything already there.
+        A name already in the folder follows `policy`: kept alongside under "<name> version",
+        replaced in place, or left as it is.
     */
-    ImportSummary importFrom (const juce::Array<juce::File>& sources);
+    ImportSummary importFrom (const juce::Array<juce::File>& sources,
+                              ImportPolicy policy = ImportPolicy::keepBoth);
 
     /** `~/Library/Application Support/KINETIC/Presets`. */
     static juce::File defaultDirectory();
@@ -122,9 +131,12 @@ private:
     juce::File fileForName (const juce::String& name) const;
     static juce::String readName (const juce::File& file);
 
-    /** Writes one preset document into this folder. Refuses a document it cannot read. */
-    juce::Result importElement (const juce::XmlElement& xml);
+    /** Writes one preset document into this folder. Refuses a document it cannot read.
+        `imported` says whether anything was written, so a skipped preset is not counted. */
+    juce::Result importElement (const juce::XmlElement& xml, ImportPolicy policy, bool& imported);
 
+    /** The entry called `name`, ignoring the factory entry, or -1. */
+    int entryNamed (const juce::String& name) const;
     bool nameExists (const juce::String& name) const;
     juce::String versionedName (const juce::String& name) const;
 

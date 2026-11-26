@@ -26,6 +26,7 @@ public:
         testStoredFileNameFallsBackToFactory();
         testFolderChangesArePickedUp();
         testExportAndImport();
+        testImportPolicies();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -304,6 +305,73 @@ private:
         expectEquals (summary.imported, 0);
         expectEquals (summary.failures.size(), 1);
         expectEquals (destination.entries().size(), 4);
+    }
+
+    void testImportPolicies()
+    {
+        beginTest ("An import keeps both, skips or replaces a name already in the folder");
+
+        // The incoming preset is called Bass but carries a different root note.
+        auto origin = makeLibrary ("policy-origin");
+
+        auto darker = makePattern();
+        darker.rootNote = 40;
+
+        juce::File incomingFile;
+        expect (origin.save (darker, 0, "Bass", {}, &incomingFile).wasOk());
+
+        juce::Array<juce::File> files;
+        files.add (incomingFile);
+
+        // Keep both, the default: the folder ends up with both patterns.
+        {
+            auto library = makeLibrary ("policy-keep-both");
+            juce::File local;
+            expect (library.save (makePattern(), 0, "Bass", {}, &local).wasOk());
+
+            const auto summary = library.importFrom (files);
+            expectEquals (summary.imported, 1);
+            expectEquals (summary.skipped, 0);
+            expectEquals (library.entries().size(), 3);
+            expectEquals (library.entries()[2].name, juce::String ("Bass version"));
+        }
+
+        // Skip: the local preset is untouched.
+        {
+            auto library = makeLibrary ("policy-skip");
+            juce::File local;
+            expect (library.save (makePattern(), 0, "Bass", {}, &local).wasOk());
+
+            const auto summary = library.importFrom (files, presets::Library::ImportPolicy::skip);
+            expectEquals (summary.imported, 0);
+            expectEquals (summary.skipped, 1);
+            expectEquals (library.entries().size(), 2);
+
+            Pattern loaded;
+            int lane = 0;
+            expect (library.load (library.entries()[1], loaded, lane));
+            expectEquals (loaded.rootNote, 67);
+        }
+
+        // Overwrite: the preset keeps its name and file, and takes the new pattern.
+        {
+            auto library = makeLibrary ("policy-overwrite");
+            juce::File local;
+            expect (library.save (makePattern(), 0, "Bass", {}, &local).wasOk());
+
+            const auto summary = library.importFrom (files,
+                                                     presets::Library::ImportPolicy::overwrite);
+            expectEquals (summary.imported, 1);
+            expectEquals (summary.skipped, 0);
+            expectEquals (library.entries().size(), 2);
+            expectEquals (library.entries()[1].name, juce::String ("Bass"));
+            expect (library.entries()[1].file == local);
+
+            Pattern loaded;
+            int lane = 0;
+            expect (library.load (library.entries()[1], loaded, lane));
+            expectEquals (loaded.rootNote, 40);
+        }
     }
 
     void testRename()

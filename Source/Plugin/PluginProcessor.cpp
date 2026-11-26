@@ -380,9 +380,9 @@ juce::Result KineticAudioProcessor::deletePreset (int index)
 }
 
 presets::Library::ImportSummary KineticAudioProcessor::importPresets (
-    const juce::Array<juce::File>& sources)
+    const juce::Array<juce::File>& sources, presets::Library::ImportPolicy policy)
 {
-    const auto summary = presetLibrary.importFrom (sources);
+    const auto summary = presetLibrary.importFrom (sources, policy);
 
     updateProgramNames();
     updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));

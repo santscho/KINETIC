@@ -268,7 +268,8 @@ juce::Result Library::exportArchive (const juce::File& target, const juce::Strin
     return juce::Result::ok();
 }
 
-Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sources)
+Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sources,
+                                             ImportPolicy policy)
 {
     ImportSummary summary;
 
@@ -298,26 +299,37 @@ Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sourc
                 if (child == nullptr || ! child->hasTagName (rootTag))
                     continue;
 
-                if (const auto result = importElement (*child); result.failed())
+                auto imported = false;
+
+                if (const auto result = importElement (*child, policy, imported); result.failed())
                     summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
-                else
+                else if (imported)
                     ++summary.imported;
+                else
+                    ++summary.skipped;
             }
 
             continue;
         }
 
-        if (const auto result = importElement (*xml); result.failed())
+        auto imported = false;
+
+        if (const auto result = importElement (*xml, policy, imported); result.failed())
             summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
-        else
+        else if (imported)
             ++summary.imported;
+        else
+            ++summary.skipped;
     }
 
     return summary;
 }
 
-juce::Result Library::importElement (const juce::XmlElement& xml)
+juce::Result Library::importElement (const juce::XmlElement& xml, ImportPolicy policy,
+                                     bool& imported)
 {
+    imported = false;
+
     if (! isPresetElement (xml))
         return juce::Result::fail ("not a KINETIC preset");
 
@@ -332,20 +344,54 @@ juce::Result Library::importElement (const juce::XmlElement& xml)
     if (name.isEmpty())
         name = "Imported";
 
-    // Keeping both rather than overwriting: importing a set twice must never lose a preset.
-    if (nameExists (name))
-        name = versionedName (name);
+    if (const auto existing = entryNamed (name); existing >= 0)
+    {
+        switch (policy)
+        {
+            case ImportPolicy::skip:
+                return juce::Result::ok();
 
-    return save (pattern, lane, name, fileForName (name));
+            case ImportPolicy::overwrite:
+            {
+                // The preset keeps its name and its file - only the pattern is replaced, so a
+                // project that refers to it by file name follows the new content.
+                const auto existingName = list[existing].name;
+                const auto existingFile = list[existing].file;
+
+                if (const auto result = save (pattern, lane, existingName, existingFile);
+                    result.failed())
+                    return result;
+
+                imported = true;
+                return juce::Result::ok();
+            }
+
+            case ImportPolicy::keepBoth:
+            default:
+                name = versionedName (name);
+                break;
+        }
+    }
+
+    if (const auto result = save (pattern, lane, name, fileForName (name)); result.failed())
+        return result;
+
+    imported = true;
+    return juce::Result::ok();
+}
+
+int Library::entryNamed (const juce::String& name) const
+{
+    for (int i = 0; i < list.size(); ++i)
+        if (! list[i].isFactory && list[i].name.equalsIgnoreCase (name))
+            return i;
+
+    return -1;
 }
 
 bool Library::nameExists (const juce::String& name) const
 {
-    for (const auto& entry : list)
-        if (! entry.isFactory && entry.name.equalsIgnoreCase (name))
-            return true;
-
-    return false;
+    return entryNamed (name) >= 0;
 }
 
 juce::String Library::versionedName (const juce::String& name) const

@@ -50,7 +50,7 @@ private:
     void promptSaveAs();
     void saveAs (const juce::String& name);
     void confirmDelete();
-    void importPresets();
+    void importPresets (presets::Library::ImportPolicy policy);
     void exportCurrentPreset();
     void exportFolder();
     void showError (const juce::String& message) const;

@@ -185,7 +185,15 @@ void PresetBar::showMenu()
         menu.addItem (i + 1, entries[i].name, true, i == selected);
 
     menu.addSeparator();
-    menu.addItem (1001, "Import presets...");
+
+    // The import policy is chosen up front rather than asked after the file picker, so what will
+    // happen to a name that is already in the folder is never a surprise.
+    juce::PopupMenu importMenu;
+    importMenu.addItem (1010, "Keep Both Presets");
+    importMenu.addItem (1011, "Replace Existing Presets");
+    importMenu.addItem (1012, "Skip Existing Presets");
+    menu.addSubMenu ("Import presets...", importMenu);
+
     menu.addItem (1002, "Export this preset...", ! factorySelected);
     menu.addItem (1003, "Export folder...");
     menu.addItem (1000, "Reveal folder in Finder");
@@ -205,9 +213,12 @@ void PresetBar::showMenu()
                                 return;
                             }
 
-                            if (result == 1001)
+                            if (result >= 1010 && result <= 1012)
                             {
-                                safeThis->importPresets();
+                                safeThis->importPresets (
+                                    result == 1011 ? presets::Library::ImportPolicy::overwrite
+                                  : result == 1012 ? presets::Library::ImportPolicy::skip
+                                                   : presets::Library::ImportPolicy::keepBoth);
                                 return;
                             }
 
@@ -334,7 +345,7 @@ void PresetBar::confirmDelete()
                                 }), true);
 }
 
-void PresetBar::importPresets()
+void PresetBar::importPresets (presets::Library::ImportPolicy policy)
 {
     fileChooser = std::make_unique<juce::FileChooser> (
         "Import presets",
@@ -347,7 +358,7 @@ void PresetBar::importPresets()
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode
                                   | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectMultipleItems,
-                              [safeThis] (const juce::FileChooser& chooser)
+                              [safeThis, policy] (const juce::FileChooser& chooser)
                               {
                                   if (safeThis == nullptr)
                                       return;
@@ -357,12 +368,17 @@ void PresetBar::importPresets()
                                   if (files.isEmpty())
                                       return;
 
-                                  const auto summary = safeThis->processor.importPresets (files);
+                                  const auto summary = safeThis->processor.importPresets (files, policy);
                                   safeThis->reloadLibrary();
 
                                   juce::String message;
                                   message << "Imported " << summary.imported
-                                          << (summary.imported == 1 ? " preset." : " presets.");
+                                          << (summary.imported == 1 ? " preset" : " presets");
+
+                                  if (summary.skipped > 0)
+                                      message << ", skipped " << summary.skipped;
+
+                                  message << ".";
 
                                   if (! summary.failures.isEmpty())
                                       message << "\n\nNot imported:\n"
