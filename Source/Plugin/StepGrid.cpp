@@ -13,6 +13,7 @@ namespace
     constexpr int headerHeight = 16;
 
     constexpr double pitchRange = 24.0;   // +/- semitones a pitch cell can reach
+    constexpr double knobTravel = 160.0;  // pixels of vertical drag for a knob's full range
 
     juce::String formatPitch (int pitch)
     {
@@ -30,13 +31,60 @@ namespace
         const auto height = juce::jmax (5.0f, cell.getHeight() * 0.34f);
         return cell.withTop (cell.getBottom() - height).reduced (1.0f, 0.5f);
     }
+
+    /** A rotary knob filling `cell`, its arc running from 7:30 to 4:30 for `t` in 0..1. */
+    void drawKnob (juce::Graphics& g, juce::Rectangle<float> cell, double t,
+                   juce::Colour colour, float dim)
+    {
+        const auto size = juce::jmin (cell.getWidth(), cell.getHeight()) - 2.0f;
+
+        if (size < 6.0f)
+            return;
+
+        const auto knob = cell.withSizeKeepingCentre (size, size);
+        const auto radius = size * 0.5f - 1.0f;
+        const auto centre = knob.getCentre();
+
+        constexpr auto startAngle = -2.3561945f;   // 7:30, JUCE measures from 12 o'clock clockwise
+        constexpr auto sweep = 4.712389f;          // 270 degrees
+
+        const auto position = static_cast<float> (juce::jlimit (0.0, 1.0, t));
+
+        juce::Path track;
+        track.addCentredArc (centre.x, centre.y, radius, radius, 0.0f,
+                             startAngle, startAngle + sweep, true);
+
+        g.setColour (theme::muted.withAlpha (dim * 0.35f));
+        g.strokePath (track, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved,
+                                                   juce::PathStrokeType::rounded));
+
+        if (position > 0.001f)
+        {
+            juce::Path arc;
+            arc.addCentredArc (centre.x, centre.y, radius, radius, 0.0f,
+                               startAngle, startAngle + sweep * position, true);
+
+            g.setColour (colour.withAlpha (dim));
+            g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved,
+                                                     juce::PathStrokeType::rounded));
+        }
+
+        const auto angle = startAngle + sweep * position;
+        const auto inner = radius * 0.2f;
+        const auto outer = radius * 0.8f;
+
+        g.setColour (colour.withAlpha (dim * 0.95f));
+        g.drawLine (centre.x + std::sin (angle) * inner, centre.y - std::cos (angle) * inner,
+                    centre.x + std::sin (angle) * outer, centre.y - std::cos (angle) * outer,
+                    1.6f);
+    }
 } // namespace
 
 StepGrid::StepGrid (SharedPattern& sharedPattern)
     : shared (sharedPattern)
 {
     setOpaque (false);
-    setTooltip ("Click or drag: triggers and slides toggle, other rows follow the pointer height, "
+    setTooltip ("Click or drag to toggle triggers and slides, drag a knob up or down to turn it, "
                 "the strip under a ratchet switches it off");
 }
 
@@ -184,57 +232,32 @@ void StepGrid::paint (juce::Graphics& g)
                     break;
 
                 case pitch:
-                {
-                    const auto t = juce::jlimit (-1.0f, 1.0f,
-                                                 static_cast<float> (value.pitch) / (float) pitchRange);
-                    const auto centre = cell.getCentreY();
-                    const auto half = cell.getHeight() * 0.5f - 2.0f;
-
-                    g.setColour (theme::muted.withAlpha (dim * 0.5f));
-                    g.fillRect (cell.getX(), centre, cell.getWidth(), 1.0f);
-
-                    if (value.pitch != 0)
-                    {
-                        auto bar = cell.withY (t >= 0.0f ? centre - half * t : centre);
-                        bar = bar.withHeight (half * std::abs (t));
-                        g.setColour (theme::violet.withAlpha (dim));
-                        g.fillRect (bar.reduced (0.5f, 0.0f));
-                    }
-
-                    if (cell.getWidth() >= 30.0f)
-                    {
-                        // The bar grows away from the centre line, so the number goes in the
-                        // half the bar leaves empty: a positive pitch fills upwards, a negative
-                        // one downwards. Centring it there keeps it off the row edges, where it
-                        // would read as belonging to the row above or below.
-                        const auto freeHalf = value.pitch > 0 ? cell.withTop (centre)
-                                                              : cell.withBottom (centre);
-
-                        g.setColour (theme::text.withAlpha (dim * 0.9f));
-                        g.setFont (theme::mono (8.5f));
-                        g.drawText (formatPitch (value.pitch), freeHalf.reduced (0.0f, 1.0f),
-                                    juce::Justification::centred, false);
-                    }
-                    break;
-                }
-
                 case velocity:
                 case mod:
-                {
-                    const auto raw = row == velocity ? (int) value.velocity : (int) value.mod;
-                    const auto t = juce::jlimit (0.0f, 1.0f, static_cast<float> (raw) / 127.0f);
-
-                    g.setColour ((row == velocity ? theme::accent : theme::violet).withAlpha (dim * 0.85f));
-                    g.fillRect (cell.withTrimmedTop (cell.getHeight() * (1.0f - t)));
-                    break;
-                }
-
                 case gate:
                 {
-                    const auto t = juce::jlimit (0.0f, 1.0f, static_cast<float> (value.gatePercent) / 100.0f);
+                    const auto colour = row == velocity ? theme::accent
+                                       : row == gate     ? theme::amber
+                                                         : theme::violet;
+                    const auto text = row == pitch  ? formatPitch (value.pitch)
+                                    : row == gate   ? juce::String ((int) value.gatePercent) + "%"
+                                    : row == mod    ? juce::String ((int) value.mod)
+                                                    : juce::String ((int) value.velocity);
 
-                    g.setColour (theme::amber.withAlpha (dim * 0.7f));
-                    g.fillRect (cell.withWidth (cell.getWidth() * t));
+                    // The reading only fits beside the knob once the cell is big enough.
+                    auto knobArea = cell;
+                    const auto showValue = cell.getWidth() >= 22.0f && cell.getHeight() >= 26.0f;
+                    const auto textArea = showValue ? knobArea.removeFromBottom (10.0f)
+                                                    : juce::Rectangle<float>();
+
+                    drawKnob (g, knobArea, normalisedValue (row, value), colour, dim);
+
+                    if (showValue)
+                    {
+                        g.setColour (theme::text.withAlpha (dim * 0.9f));
+                        g.setFont (theme::mono (8.0f));
+                        g.drawText (text, textArea, juce::Justification::centred, false);
+                    }
                     break;
                 }
 
@@ -283,60 +306,117 @@ void StepGrid::paint (juce::Graphics& g)
 
 void StepGrid::mouseDown (const juce::MouseEvent& e)
 {
-    applyGesture (e, true);
-}
+    dragRow = rowAt (static_cast<int> (e.position.y));
+    dragStep = stepAt (static_cast<int> (e.position.x));
 
-void StepGrid::mouseDrag (const juce::MouseEvent& e)
-{
-    applyGesture (e, false);
-}
-
-void StepGrid::applyGesture (const juce::MouseEvent& e, bool firstOfGesture)
-{
-    const auto row = rowAt (static_cast<int> (e.position.y));
-    const auto step = stepAt (static_cast<int> (e.position.x));
-
-    if (row < 0 || step < 0)
+    if (dragRow < 0 || dragStep < 0)
         return;
 
-    auto& value = currentLane().steps[static_cast<std::size_t> (step)];
-    const auto band = rowBounds (row).toFloat();
+    auto& value = currentLane().steps[static_cast<std::size_t> (dragStep)];
 
-    // 1 at the top of the row band, 0 at the bottom.
-    const auto t = juce::jlimit (0.0, 1.0,
-                                 1.0 - (static_cast<double> (e.position.y) - band.getY())
-                                           / juce::jmax (1.0f, band.getHeight()));
+    dragStartY = e.position.y;
+    dragStartValue = normalisedValue (dragRow, value);
 
-    if (firstOfGesture)
+    switch (dragRow)
     {
-        if (row == trigger)
-            toggleTarget = ! value.trigger;
-        else if (row == slide)
-            toggleTarget = ! value.slide;
-    }
+        case trigger:
+        case slide:
+            toggleTarget = dragRow == trigger ? ! value.trigger : ! value.slide;
 
-    switch (row)
-    {
-        case trigger:  value.trigger = toggleTarget; break;
-        case slide:    value.slide = toggleTarget; break;
-        case pitch:    value.pitch = static_cast<juce::int8> (std::lround (-pitchRange + t * pitchRange * 2.0)); break;
-        case velocity: value.velocity = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
-        case mod:      value.mod = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
-        case gate:     value.gatePercent = static_cast<juce::uint8> (std::lround (2.0 + t * 98.0)); break;
-        case ratchet:
-        {
-            const auto strip = ratchetClearStrip (cellBounds (ratchet, step));
-
-            value.ratchets = strip.contains (e.position)
-                               ? 1
-                               : static_cast<juce::uint8> (juce::jlimit (1, 8, 1 + (int) std::floor (t * 8.0)));
+            if (dragRow == trigger)
+                value.trigger = toggleTarget;
+            else
+                value.slide = toggleTarget;
             break;
-        }
-        default:       return;
+
+        case ratchet:
+            setRatchetFromPointer (dragStep, e.position);
+            break;
+
+        default:
+            return;     // a knob turns with the drag rather than jumping to the click
     }
 
     shared.publish();
     repaint();
+}
+
+void StepGrid::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragRow < 0 || dragStep < 0)
+        return;
+
+    // Toggles paint across columns; a knob stays on the cell it grabbed, so dragging past the
+    // row border never edits the cell above or below.
+    const auto paintsColumns = dragRow == trigger || dragRow == slide || dragRow == ratchet;
+    const auto step = paintsColumns ? stepAt (static_cast<int> (e.position.x)) : dragStep;
+
+    if (step < 0)
+        return;
+
+    auto& value = currentLane().steps[static_cast<std::size_t> (step)];
+
+    switch (dragRow)
+    {
+        case trigger: value.trigger = toggleTarget; break;
+        case slide:   value.slide = toggleTarget; break;
+
+        case ratchet:
+            setRatchetFromPointer (step, e.position);
+            break;
+
+        default:
+            setNormalisedValue (dragRow, value,
+                                dragStartValue + (dragStartY - e.position.y) / knobTravel);
+            break;
+    }
+
+    shared.publish();
+    repaint();
+}
+
+double StepGrid::normalisedValue (int row, const Step& step) noexcept
+{
+    switch (row)
+    {
+        case pitch:    return (static_cast<double> (step.pitch) + pitchRange) / (pitchRange * 2.0);
+        case velocity: return static_cast<double> (step.velocity) / 127.0;
+        case mod:      return static_cast<double> (step.mod) / 127.0;
+        case gate:     return (static_cast<double> (juce::jlimit (2, 100, (int) step.gatePercent)) - 2.0) / 98.0;
+        default:       break;
+    }
+
+    return 0.0;
+}
+
+void StepGrid::setNormalisedValue (int row, Step& step, double t) noexcept
+{
+    t = juce::jlimit (0.0, 1.0, t);
+
+    switch (row)
+    {
+        case pitch:    step.pitch = static_cast<juce::int8> (std::lround (-pitchRange + t * pitchRange * 2.0)); break;
+        case velocity: step.velocity = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
+        case mod:      step.mod = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
+        case gate:     step.gatePercent = static_cast<juce::uint8> (std::lround (2.0 + t * 98.0)); break;
+        default:       break;
+    }
+}
+
+void StepGrid::setRatchetFromPointer (int step, juce::Point<float> position)
+{
+    auto& value = currentLane().steps[static_cast<std::size_t> (step)];
+    const auto strip = ratchetClearStrip (cellBounds (ratchet, step));
+    const auto band = rowBounds (ratchet).toFloat();
+
+    // 1 at the top of the row band, 0 at the bottom.
+    const auto t = juce::jlimit (0.0, 1.0,
+                                 1.0 - (static_cast<double> (position.y) - band.getY())
+                                           / juce::jmax (1.0f, band.getHeight()));
+
+    value.ratchets = strip.contains (position)
+                       ? 1
+                       : static_cast<juce::uint8> (juce::jlimit (1, 8, 1 + (int) std::floor (t * 8.0)));
 }
 
 } // namespace kinetic
