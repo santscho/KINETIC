@@ -4,7 +4,7 @@ KINETIC is a sample-accurate, pure MIDI FX step sequencer for macOS. It generate
 the host's audio callback from the host's own transport position; nothing is scheduled by a UI
 timer. It makes no audio of its own and does not listen to incoming MIDI.
 
-- **Version documented:** 0.5.0
+- **Version documented:** 0.6.0
 - **Formats:** Audio Unit MIDI Effect (`aumi`) and VST3 (instrument-class, silent stereo output)
 - **Platform:** macOS 11 or later, Apple Silicon by default (Universal build opt-in)
 - **Licence:** GPLv3
@@ -302,7 +302,7 @@ triggered step, instead of notes.
 ## 6. Engine features not yet exposed in the editor
 
 The following exist in the engine, are saved and restored with the session, and are settable
-through the state format — but the editor has no controls for them in 0.5.0.
+through the state format — but the editor has no controls for them in 0.6.0.
 
 ### 6.1 Lane type
 
