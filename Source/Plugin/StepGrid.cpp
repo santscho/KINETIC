@@ -383,7 +383,7 @@ void StepGrid::paint (juce::Graphics& g)
                         if (cell.getWidth() >= 18.0f)
                         {
                             g.setColour (theme::background);
-                            g.setFont (theme::mono (8.5f));
+                            g.setFont (theme::mono (10.5f));
                             g.drawText ("x" + juce::String ((int) value.ratchets),
                                         cell.withTrimmedBottom (strip.getHeight()),
                                         juce::Justification::centred, false);
@@ -610,14 +610,18 @@ void StepGrid::setRatchetFromPointer (int step, juce::Point<float> position)
     const auto strip = ratchetClearStrip (cellBounds (ratchet, step));
     const auto band = rowBounds (ratchet).toFloat();
 
-    // 1 at the top of the row band, 0 at the bottom.
+    // 1 at the top of the band above the strip, 0 at the strip's top edge. The strip is the
+    // only way back to "off", so the seven ratchet factors share the rest of the cell and x2,
+    // the default, sits directly on top of the strip.
+    const auto height = juce::jmax (1.0f, strip.getY() - band.getY());
     const auto t = juce::jlimit (0.0, 1.0,
                                  1.0 - (static_cast<double> (position.y) - band.getY())
-                                           / juce::jmax (1.0f, band.getHeight()));
+                                           / static_cast<double> (height));
 
     value.ratchets = strip.contains (position)
                        ? 1
-                       : static_cast<juce::uint8> (juce::jlimit (1, 8, 1 + (int) std::floor (t * 8.0)));
+                       : static_cast<juce::uint8> (juce::jlimit (2, 8,
+                                                                 2 + (int) std::floor (t * 7.0)));
 }
 
 } // namespace kinetic
