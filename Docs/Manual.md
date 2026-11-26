@@ -93,7 +93,7 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 ┌──────────────────────────────────────────────────────────────┐
 │ KINETIC                                              [ VST3 ] │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
-│ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾ − +      OCT 3 │
+│ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾ − + C1 ▾ OCT 3 │
 │ SCALE ON    KEY C ▾    MODE MAJOR ▾                           │
 │  1   2   3   4   5   6   7   8   9  10 …                      │
 │ TRIG  █       █                                               │
@@ -133,7 +133,7 @@ say the same as the table below.
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
-| Root note (`−` `+`, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. `+` and `−` transpose it one octave up or down, and the `OCT` readout shows the octave of the current note (`C3` reads `OCT 3`). |
+| Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. The list always holds `C1` to `B1`; `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
 | Key | `C` … `B` | Key of the scale. |
 | Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
@@ -243,9 +243,9 @@ through the state format — but the editor has no controls for them in 0.5.0.
 ### 6.2 MIDI channel and root note
 
 The MIDI channel is per lane, 1–16 (default 1), and still state-format only. The root note is one
-note for the whole pattern, 0–127 (default 60, i.e. C3 in Live/JUCE naming): it is transposed by
-the editor's `−`/`+` octave buttons (§4.3), and the painted pitch of every lane is an offset from
-it, so one transpose moves all eight lanes together.
+note for the whole pattern, 0–127 (default 60, i.e. C3 in Live/JUCE naming): it is picked from the
+editor's `C1`–`B1` note list and transposed by its `−`/`+` octave buttons (§4.3), and the painted
+pitch of every lane is an offset from it, so one transpose moves all eight lanes together.
 
 ### 6.3 Scales
 
