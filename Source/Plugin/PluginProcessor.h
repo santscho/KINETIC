@@ -19,7 +19,8 @@ namespace kinetic
     AudioPlayHead -> TransportInput, commands from the editor -> lock-free queue, and the
     engine's generated events -> the host MidiBuffer. No UI timer ever schedules MIDI.
 */
-class KineticAudioProcessor final : public juce::AudioProcessor
+class KineticAudioProcessor final : public juce::AudioProcessor,
+                                    private juce::AsyncUpdater
 {
 public:
     KineticAudioProcessor();
@@ -107,6 +108,9 @@ public:
 private:
     kinetic::TransportInput readTransportInput() const;
     void publishTelemetry (const kinetic::BlockTiming& timing) noexcept;
+
+    /** Tells the host its program changed, once the state load that caused it has returned. */
+    void handleAsyncUpdate() override;
 
     void updateProgramNames();
     int programIndexForFile (const juce::File& file) const;
