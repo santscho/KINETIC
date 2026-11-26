@@ -13,6 +13,9 @@ namespace
     constexpr int gutterWidth = 58;
     constexpr int headerHeight = 16;
 
+    constexpr int columnsPerPage = 32;      // columns that fit before the grid scrolls
+    constexpr int scrollBarThickness = 10;
+
     constexpr double knobTravel = 160.0;    // pixels of vertical drag for a knob's full range
     constexpr float pitchButtonWidth = 13.0f;
 
@@ -161,12 +164,31 @@ StepGrid::StepGrid (SharedPattern& sharedPattern)
     setOpaque (false);
     setTooltip ("Click or drag to toggle triggers and slides, drag a knob up or down to turn it, "
                 "click a pitch cell for its notes, the strip under a ratchet switches it off");
+
+    horizontalScrollBar.setAutoHide (false);
+    horizontalScrollBar.setColour (juce::ScrollBar::backgroundColourId, theme::panel);
+    horizontalScrollBar.setColour (juce::ScrollBar::thumbColourId, theme::raised.brighter (0.32f));
+    horizontalScrollBar.setColour (juce::ScrollBar::trackColourId, theme::raised.withAlpha (0.4f));
+    horizontalScrollBar.addListener (this);
+    addChildComponent (horizontalScrollBar);
 }
 
 void StepGrid::setLane (int newLaneIndex)
 {
     laneIndex = juce::jlimit (0, maxLanes - 1, newLaneIndex);
+    layOutScrollBar();
     repaint();
+}
+
+void StepGrid::refresh()
+{
+    layOutScrollBar();
+    repaint();
+}
+
+void StepGrid::resized()
+{
+    layOutScrollBar();
 }
 
 juce::String StepGrid::rowLabel (int row)
@@ -191,12 +213,41 @@ int StepGrid::numColumns() const noexcept
     return juce::jmax (16, juce::jlimit (1, maxSteps, currentLane().settings.gateLength));
 }
 
-juce::Rectangle<int> StepGrid::rowBounds (int row) const noexcept
+/** One column never gets narrower than it is at 32 columns: a longer loop scrolls instead. */
+float StepGrid::cellWidth() const noexcept
+{
+    const auto fitted = static_cast<float> (juce::jmin (numColumns(), columnsPerPage));
+    const auto available = static_cast<float> (juce::jmax (0, getWidth() - gutterWidth));
+
+    return juce::jmax (1.0f, available / fitted);
+}
+
+double StepGrid::maxScroll() const noexcept
+{
+    const auto content = static_cast<double> (numColumns()) * cellWidth();
+    const auto visible = static_cast<double> (juce::jmax (0, getWidth() - gutterWidth));
+
+    return juce::jmax (0.0, content - visible);
+}
+
+int StepGrid::scrollBarHeight() const noexcept
+{
+    return maxScroll() > 0.0 ? scrollBarThickness : 0;
+}
+
+juce::Rectangle<int> StepGrid::cellArea() const noexcept
 {
     auto area = getLocalBounds();
     area.removeFromLeft (gutterWidth);
     area.removeFromTop (headerHeight);
+    area.removeFromBottom (scrollBarHeight());
 
+    return area;
+}
+
+juce::Rectangle<int> StepGrid::rowBounds (int row) const noexcept
+{
+    const auto area = cellArea();
     const auto rowHeight = area.getHeight() / numRows;
 
     return { area.getX(), area.getY() + row * rowHeight, area.getWidth(), rowHeight };
@@ -205,9 +256,11 @@ juce::Rectangle<int> StepGrid::rowBounds (int row) const noexcept
 juce::Rectangle<float> StepGrid::cellBounds (int row, int step) const noexcept
 {
     const auto band = rowBounds (row).toFloat();
-    const auto width = band.getWidth() / static_cast<float> (numColumns());
+    const auto width = cellWidth();
+    const auto x = band.getX() + width * static_cast<float> (step)
+                                 - static_cast<float> (scrollPixels);
 
-    return { band.getX() + width * static_cast<float> (step) + 1.0f,
+    return { x + 1.0f,
              band.getY() + 1.0f,
              width - 2.0f,
              juce::jmax (1.0f, band.getHeight() - 2.0f) };
@@ -228,14 +281,65 @@ int StepGrid::rowAt (int y) const noexcept
 int StepGrid::stepAt (int x) const noexcept
 {
     const auto band = rowBounds (0);
-    const auto width = static_cast<float> (band.getWidth()) / static_cast<float> (numColumns());
+    const auto width = cellWidth();
 
     if (x < band.getX() || width <= 0.0f)
         return -1;
 
-    const auto step = static_cast<int> (static_cast<float> (x - band.getX()) / width);
+    const auto offset = static_cast<float> (x - band.getX()) + static_cast<float> (scrollPixels);
+    const auto step = static_cast<int> (std::floor (offset / width));
 
     return step >= 0 && step < numColumns() ? step : -1;
+}
+
+void StepGrid::layOutScrollBar()
+{
+    if (getWidth() <= gutterWidth)
+        return;
+
+    const auto visible = static_cast<double> (getWidth() - gutterWidth);
+    const auto content = static_cast<double> (numColumns()) * cellWidth();
+    const auto overflow = juce::jmax (0.0, content - visible);
+
+    // Shrinking the loop while scrolled leaves the strip hidden: the view returns to the first
+    // column rather than staying past the end of the loop.
+    scrollPixels = juce::jlimit (0.0, overflow, scrollPixels);
+
+    auto strip = getLocalBounds().removeFromBottom (scrollBarHeight());
+    strip.removeFromLeft (gutterWidth);
+
+    horizontalScrollBar.setBounds (strip.reduced (0, 1));
+    horizontalScrollBar.setVisible (overflow > 0.0);
+    horizontalScrollBar.setRangeLimits (0.0, juce::jmax (content, visible), juce::dontSendNotification);
+    horizontalScrollBar.setCurrentRange (scrollPixels, visible, juce::dontSendNotification);
+}
+
+void StepGrid::scrollBarMoved (juce::ScrollBar* bar, double newRangeStart)
+{
+    if (bar != &horizontalScrollBar)
+        return;
+
+    scrollPixels = juce::jlimit (0.0, maxScroll(), newRangeStart);
+    repaint();
+}
+
+void StepGrid::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    if (maxScroll() <= 0.0)
+        return;
+
+    // There is nothing to scroll vertically, so the wheel walks along the steps; a trackpad's
+    // sideways gesture does the same.
+    const auto amount = std::abs (wheel.deltaX) > std::abs (wheel.deltaY) ? wheel.deltaX : wheel.deltaY;
+    const auto direction = wheel.isReversed ? -1.0 : 1.0;
+
+    scrollPixels = juce::jlimit (0.0, maxScroll(),
+                                 scrollPixels - static_cast<double> (amount) * direction * 240.0);
+
+    horizontalScrollBar.setCurrentRange (scrollPixels,
+                                         static_cast<double> (getWidth() - gutterWidth),
+                                         juce::dontSendNotification);
+    repaint();
 }
 
 void StepGrid::paint (juce::Graphics& g)
@@ -244,19 +348,41 @@ void StepGrid::paint (juce::Graphics& g)
     const auto& pattern = shared.edit();
     const auto columns = numColumns();
     const auto loopLength = juce::jlimit (1, maxSteps, lane.settings.gateLength);
-    const auto cellWidth = static_cast<float> (rowBounds (0).getWidth()) / static_cast<float> (columns);
+    const auto columnWidth = cellWidth();
+    const auto area = cellArea();
 
     g.setColour (theme::panel);
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
 
-    // Step numbers in the header strip above the rows; every fourth one when they are narrow.
-    const auto labelEvery = cellWidth >= 16.0f ? 1 : 4;
+    for (int row = 0; row < numRows; ++row)
+    {
+        const auto band = rowBounds (row);
 
-    if (cellWidth >= 8.0f)
+        g.setColour (theme::muted);
+        g.setFont (theme::mono (9.5f));
+        g.drawText (rowLabel (row),
+                    juce::Rectangle<int> (2, band.getY(), gutterWidth - 8, band.getHeight()),
+                    juce::Justification::centredRight, false);
+    }
+
+    // A loop longer than 32 steps scrolls, so only the columns inside the window are drawn. The
+    // clip keeps a half scrolled column from painting over the row labels in the gutter.
+    const auto firstStep = juce::jmax (0, static_cast<int> (std::floor (scrollPixels / columnWidth)));
+    const auto lastStep = juce::jmin (columns - 1,
+                                      static_cast<int> (std::floor ((scrollPixels + area.getWidth())
+                                                                    / columnWidth)));
+
+    juce::Graphics::ScopedSaveState clipped (g);
+    g.reduceClipRegion (area.withTop (0));
+
+    // Step numbers in the header strip above the rows; every fourth one when they are narrow.
+    const auto labelEvery = columnWidth >= 16.0f ? 1 : 4;
+
+    if (columnWidth >= 8.0f)
     {
         g.setFont (theme::mono (9.0f));
 
-        for (int step = 0; step < columns; step += labelEvery)
+        for (int step = firstStep - firstStep % labelEvery; step <= lastStep; step += labelEvery)
         {
             const auto cell = cellBounds (0, step);
 
@@ -270,15 +396,7 @@ void StepGrid::paint (juce::Graphics& g)
 
     for (int row = 0; row < numRows; ++row)
     {
-        const auto band = rowBounds (row);
-
-        g.setColour (theme::muted);
-        g.setFont (theme::mono (9.5f));
-        g.drawText (rowLabel (row),
-                    juce::Rectangle<int> (2, band.getY(), gutterWidth - 8, band.getHeight()),
-                    juce::Justification::centredRight, false);
-
-        for (int step = 0; step < columns; ++step)
+        for (int step = firstStep; step <= lastStep; ++step)
         {
             auto cell = cellBounds (row, step);
             const auto& value = lane.steps[static_cast<std::size_t> (step)];
