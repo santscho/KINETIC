@@ -156,16 +156,18 @@ Seven rows, one column per step:
 | Row | Interaction | Range |
 | --- | --- | --- |
 | `TRIG` | Click or drag toggles | on / off |
-| `PITCH` | Pointer height in the cell | −24…+24 semitones from the lane root |
-| `VEL` | Pointer height | 0–127, default 100 |
-| `MOD` | Pointer height | 0–127, default 64 |
-| `GATE` | Pointer height | 2–100 % of the step, default 50 % |
+| `PITCH` | Knob, turned by dragging up or down | −24…+24 semitones from the pattern root |
+| `VEL` | Knob, turned by dragging up or down | 0–127, default 100 |
+| `MOD` | Knob, turned by dragging up or down | 0–127, default 64 |
+| `GATE` | Knob, turned by dragging up or down | 2–100 % of the step, default 50 % |
 | `RATCH` | Pointer height; the `-` strip at the bottom of the cell switches it off | 1–8 sub-triggers per step |
 | `SLIDE` | Click or drag toggles | on / off |
 
 `TRIG` and `SLIDE` toggle based on the cell you first touched in the gesture, so a drag across a
-row paints everything to the same state. Value rows take their value from the pointer's height at
-every cell, so a drag writes a contour.
+row paints everything to the same state. A drag never changes row, and a knob drag stays on the
+cell it grabbed: pulling past the top or bottom border cannot edit the cell in the row above or
+below. A knob takes about 160 px of vertical travel for its full range, so a click alone leaves it
+unchanged and a slow drag sets fine values.
 
 The columns are shaded in alternating groups of four, so beats are easy to follow. Step numbers
 appear in the header strip; when cells get narrow only every fourth number is drawn.
