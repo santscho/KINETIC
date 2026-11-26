@@ -154,12 +154,13 @@ Direction details:
 
 ### 4.4 The grid
 
-Seven rows, one column per step:
+Seven rows, one column per step. `VEL`, `MOD` and `GATE` are knobs; `PITCH` is a note picker;
+`TRIG`, `RATCH` and `SLIDE` are clicked.
 
 | Row | Interaction | Range |
 | --- | --- | --- |
 | `TRIG` | Click or drag toggles | on / off |
-| `PITCH` | Knob, turned by dragging up or down | −24…+24 semitones from the pattern root |
+| `PITCH` | Click the cell to pick a note of the octave it sits in; the small `−` and `+` at its sides move the note an octave | Any MIDI note, stored as an offset from the pattern root. With scale aware on, the list offers only the notes of the key and mode. |
 | `VEL` | Knob, turned by dragging up or down | 0–127, default 100 |
 | `MOD` | Knob, turned by dragging up or down | 0–127, default 64 |
 | `GATE` | Knob, turned by dragging up or down | 2–100 % of the step, default 50 % |
@@ -171,6 +172,14 @@ row paints everything to the same state. A drag never changes row, and a knob dr
 cell it grabbed: pulling past the top or bottom border cannot edit the cell in the row above or
 below. A knob takes about 160 px of vertical travel for its full range, so a click alone leaves it
 unchanged and a slow drag sets fine values.
+
+The pitch cell is a picker, not a knob: it names the note it plays (the pattern root plus the
+step's offset, e.g. `E3`), clicking it lists the twelve notes of that octave with the current one
+ticked, and the small `−`/`+` buttons beside it move the note one octave down or up. When cells
+are too narrow for those buttons, the list carries `Octave up` and `Octave down` instead, and a
+cell too narrow for the octave number shows just the note letter. The painted note is what the
+step plays before scale aware quantises it, and the picker only offers in-scale notes while scale
+aware is on, so picking a note is enough to land on it.
 
 The columns are shaded in alternating groups of four, so beats are easy to follow. Step numbers
 appear in the header strip; when cells get narrow only every fourth number is drawn.
