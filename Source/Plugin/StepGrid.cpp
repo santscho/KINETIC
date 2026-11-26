@@ -1,5 +1,6 @@
 #include "StepGrid.h"
 
+#include "Core/Sequencer/SequenceMath.h"
 #include "Theme.h"
 
 #include <cmath>
@@ -12,12 +13,86 @@ namespace
     constexpr int gutterWidth = 58;
     constexpr int headerHeight = 16;
 
-    constexpr double pitchRange = 24.0;   // +/- semitones a pitch cell can reach
-    constexpr double knobTravel = 160.0;  // pixels of vertical drag for a knob's full range
+    constexpr double knobTravel = 160.0;    // pixels of vertical drag for a knob's full range
+    constexpr float pitchButtonWidth = 13.0f;
 
-    juce::String formatPitch (int pitch)
+    juce::String noteName (int note)
     {
-        return (pitch > 0 ? "+" : "") + juce::String (pitch);
+        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F",
+                                             "F#", "G", "G#", "A", "A#", "B" };
+
+        note = juce::jlimit (0, 127, note);
+
+        return juce::String (names[note % 12]) + juce::String (note / 12 - 2);
+    }
+
+    juce::String pitchClassName (int note)
+    {
+        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F",
+                                             "F#", "G", "G#", "A", "A#", "B" };
+
+        return names[juce::jlimit (0, 127, note) % 12];
+    }
+
+    /** The note a pitch cell plays: its offset from the pattern root, clamped to the MIDI range. */
+    int absoluteNote (int rootNote, int pitchOffset) noexcept
+    {
+        return juce::jlimit (0, 127, rootNote + pitchOffset);
+    }
+
+    /** Absolute pitch classes the active key and scale allow; 0x0fff while scale aware is off. */
+    juce::uint16 allowedPitchClasses (const Pattern& pattern) noexcept
+    {
+        if (! pattern.scaleEnabled)
+            return 0x0fff;
+
+        const auto mask = math::scaleMask (pattern.globalScale, pattern.customScaleMask);
+
+        if ((mask & 0x0fffu) == 0x0fffu)
+            return 0x0fff;
+
+        juce::uint16 allowed = 0;
+
+        for (int pitchClass = 0; pitchClass < 12; ++pitchClass)
+        {
+            const auto degree = (((pitchClass - pattern.globalRoot) % 12) + 12) % 12;
+
+            if (((mask >> degree) & 1) != 0)
+                allowed = static_cast<juce::uint16> (allowed | (1u << pitchClass));
+        }
+
+        return allowed;
+    }
+
+    /** The pitch cell turns into a note picker once it is wide enough for its two buttons. */
+    bool showsPitchButtons (juce::Rectangle<float> cell) noexcept
+    {
+        return cell.getWidth() >= 40.0f && cell.getHeight() >= 20.0f;
+    }
+
+    juce::Rectangle<float> pitchOctaveButton (juce::Rectangle<float> cell, bool up) noexcept
+    {
+        const auto width = juce::jmin (pitchButtonWidth, cell.getWidth() * 0.34f);
+        const auto height = juce::jmin (cell.getHeight(), 18.0f);
+        const auto x = up ? cell.getRight() - width : cell.getX();
+
+        return { x, cell.getCentreY() - height * 0.5f, width, height };
+    }
+
+    /** A minus or plus glyph, drawn rather than typed so it stays sharp in a 13 pixel button. */
+    void drawPitchButton (juce::Graphics& g, juce::Rectangle<float> area, bool up, float dim)
+    {
+        g.setColour (theme::raised.brighter (0.14f).withAlpha (dim));
+        g.fillRoundedRectangle (area.reduced (0.5f), 1.5f);
+
+        const auto arm = juce::jmax (1.5f, juce::jmin (area.getWidth(), area.getHeight()) * 0.26f);
+        const auto centre = area.getCentre();
+
+        g.setColour (theme::muted.withAlpha (dim * 0.95f));
+        g.fillRect (juce::Rectangle<float> (arm * 2.0f, 1.2f).withCentre (centre));
+
+        if (up)
+            g.fillRect (juce::Rectangle<float> (1.2f, arm * 2.0f).withCentre (centre));
     }
 
     /** The strip along the bottom of a RATCH cell that switches the ratchet off.
@@ -85,7 +160,7 @@ StepGrid::StepGrid (SharedPattern& sharedPattern)
 {
     setOpaque (false);
     setTooltip ("Click or drag to toggle triggers and slides, drag a knob up or down to turn it, "
-                "the strip under a ratchet switches it off");
+                "click a pitch cell for its notes, the strip under a ratchet switches it off");
 }
 
 void StepGrid::setLane (int newLaneIndex)
@@ -166,6 +241,7 @@ int StepGrid::stepAt (int x) const noexcept
 void StepGrid::paint (juce::Graphics& g)
 {
     const auto& lane = currentLane();
+    const auto& pattern = shared.edit();
     const auto columns = numColumns();
     const auto loopLength = juce::jlimit (1, maxSteps, lane.settings.gateLength);
     const auto cellWidth = static_cast<float> (rowBounds (0).getWidth()) / static_cast<float> (columns);
@@ -232,6 +308,40 @@ void StepGrid::paint (juce::Graphics& g)
                     break;
 
                 case pitch:
+                {
+                    // A note picker rather than a knob: the cell names the note it plays, the
+                    // small buttons beside it move that note an octave, and clicking the name
+                    // opens the notes of its octave.
+                    const auto note = absoluteNote (pattern.rootNote, value.pitch);
+
+                    g.setColour (theme::violet.withAlpha (dim * 0.3f));
+                    g.drawRoundedRectangle (cell.reduced (0.5f), 2.0f, 1.0f);
+
+                    g.setColour (theme::text.withAlpha (dim * 0.92f));
+
+                    if (showsPitchButtons (cell))
+                    {
+                        drawPitchButton (g, pitchOctaveButton (cell, false), false, dim);
+                        drawPitchButton (g, pitchOctaveButton (cell, true), true, dim);
+
+                        g.setFont (theme::mono (9.0f));
+                        g.drawText (noteName (note),
+                                    cell.withTrimmedLeft (pitchButtonWidth + 1.0f)
+                                        .withTrimmedRight (pitchButtonWidth + 1.0f),
+                                    juce::Justification::centred, false);
+                    }
+                    else
+                    {
+                        // Too narrow for buttons: the note alone, then only its pitch class.
+                        const auto wide = cell.getWidth() >= 20.0f;
+
+                        g.setFont (theme::mono (wide ? 8.0f : 6.5f));
+                        g.drawText (wide ? noteName (note) : pitchClassName (note),
+                                    cell, juce::Justification::centred, false);
+                    }
+                    break;
+                }
+
                 case velocity:
                 case mod:
                 case gate:
@@ -239,10 +349,9 @@ void StepGrid::paint (juce::Graphics& g)
                     const auto colour = row == velocity ? theme::accent
                                        : row == gate     ? theme::amber
                                                          : theme::violet;
-                    const auto text = row == pitch  ? formatPitch (value.pitch)
-                                    : row == gate   ? juce::String ((int) value.gatePercent) + "%"
-                                    : row == mod    ? juce::String ((int) value.mod)
-                                                    : juce::String ((int) value.velocity);
+                    const auto text = row == gate ? juce::String ((int) value.gatePercent) + "%"
+                                    : row == mod  ? juce::String ((int) value.mod)
+                                                  : juce::String ((int) value.velocity);
 
                     // The reading only fits beside the knob once the cell is big enough.
                     auto knobArea = cell;
@@ -333,6 +442,23 @@ void StepGrid::mouseDown (const juce::MouseEvent& e)
             setRatchetFromPointer (dragStep, e.position);
             break;
 
+        case pitch:
+        {
+            const auto cell = cellBounds (pitch, dragStep);
+            const auto buttons = showsPitchButtons (cell);
+
+            if (buttons && pitchOctaveButton (cell, false).contains (e.position))
+                shiftPitchOctave (dragStep, -1);
+            else if (buttons && pitchOctaveButton (cell, true).contains (e.position))
+                shiftPitchOctave (dragStep, 1);
+            else
+                showPitchMenu (dragStep, cell);
+
+            dragRow = -1;       // a pitch cell is clicked, never dragged
+            dragStep = -1;
+            return;
+        }
+
         default:
             return;     // a knob turns with the drag rather than jumping to the click
     }
@@ -379,7 +505,6 @@ double StepGrid::normalisedValue (int row, const Step& step) noexcept
 {
     switch (row)
     {
-        case pitch:    return (static_cast<double> (step.pitch) + pitchRange) / (pitchRange * 2.0);
         case velocity: return static_cast<double> (step.velocity) / 127.0;
         case mod:      return static_cast<double> (step.mod) / 127.0;
         case gate:     return (static_cast<double> (juce::jlimit (2, 100, (int) step.gatePercent)) - 2.0) / 98.0;
@@ -395,12 +520,85 @@ void StepGrid::setNormalisedValue (int row, Step& step, double t) noexcept
 
     switch (row)
     {
-        case pitch:    step.pitch = static_cast<juce::int8> (std::lround (-pitchRange + t * pitchRange * 2.0)); break;
         case velocity: step.velocity = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
         case mod:      step.mod = static_cast<juce::uint8> (std::lround (t * 127.0)); break;
         case gate:     step.gatePercent = static_cast<juce::uint8> (std::lround (2.0 + t * 98.0)); break;
         default:       break;
     }
+}
+
+void StepGrid::setPitch (int step, int note)
+{
+    // The cell stores an offset from the pattern root, so a note picked here survives a
+    // transpose; the whole MIDI range is reachable, the engine clamps nothing further.
+    auto& value = currentLane().steps[static_cast<std::size_t> (step)];
+
+    value.pitch = static_cast<juce::int8> (juce::jlimit (0, 127, note) - shared.edit().rootNote);
+    shared.publish();
+    repaint();
+}
+
+void StepGrid::shiftPitchOctave (int step, int direction)
+{
+    auto& value = currentLane().steps[static_cast<std::size_t> (step)];
+    const auto shifted = static_cast<int> (value.pitch) + 12 * direction;
+    const auto note = shared.edit().rootNote + shifted;
+
+    // Refused at the ends rather than clamped, so the note keeps the pitch class it was picked
+    // with - the same rule the root note's octave buttons follow.
+    if (note < 0 || note > 127)
+        return;
+
+    value.pitch = static_cast<juce::int8> (shifted);
+    shared.publish();
+    repaint();
+}
+
+void StepGrid::showPitchMenu (int step, juce::Rectangle<float> anchor)
+{
+    const auto& pattern = shared.edit();
+    const auto note = absoluteNote (pattern.rootNote,
+                                   currentLane().steps[static_cast<std::size_t> (step)].pitch);
+    const auto octave = note / 12;                  // the octave the cell currently sits in
+    const auto allowed = allowedPitchClasses (pattern);
+    const auto buttons = showsPitchButtons (cellBounds (pitch, step));
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("Octave " + juce::String (octave - 2));
+
+    for (int pitchClass = 0; pitchClass < 12; ++pitchClass)
+        if (((allowed >> pitchClass) & 1) != 0)
+        {
+            const auto candidate = octave * 12 + pitchClass;
+            menu.addItem (pitchClass + 1, noteName (candidate), candidate == note);
+        }
+
+    // With the buttons hidden by a narrow grid the menu carries the octave moves instead.
+    if (! buttons)
+    {
+        menu.addSeparator();
+        menu.addItem (100, "Octave up");
+        menu.addItem (101, "Octave down");
+    }
+
+    juce::Component::SafePointer<StepGrid> safeThis (this);
+
+    menu.showMenuAsync (juce::PopupMenu::Options()
+                            .withTargetScreenArea (localAreaToGlobal (anchor.toNearestInt()))
+                            .withParentComponent (getTopLevelComponent()),
+                        [safeThis, step, octave] (int result)
+                        {
+                            if (safeThis == nullptr || result <= 0)
+                                return;
+
+                            if (result == 100 || result == 101)
+                            {
+                                safeThis->shiftPitchOctave (step, result == 100 ? 1 : -1);
+                                return;
+                            }
+
+                            safeThis->setPitch (step, octave * 12 + (result - 1));
+                        });
 }
 
 void StepGrid::setRatchetFromPointer (int step, juce::Point<float> position)

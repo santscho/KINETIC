@@ -11,10 +11,12 @@ namespace kinetic
     The step grid: one column per step, seven rows of parameters.
 
     Trigger and slide cells toggle and paint across columns; the value rows are knobs, turned by
-    a vertical drag. A drag never changes row, and a knob drag stays on the cell it grabbed, so
-    crossing a row border cannot edit the cell above or below. Every change is published
-    immediately, so the audio thread picks it up at its next block boundary - the grid never
-    touches the pattern the sequencer is reading.
+    a vertical drag, except the pitch row, which is a note picker: each cell shows the note it
+    lands on and opens a list of the notes of its octave, with a small minus and plus beside it
+    to move the note an octave. A drag never changes row, and a knob drag stays on the cell it
+    grabbed, so crossing a row border cannot edit the cell above or below. Every change is
+    published immediately, so the audio thread picks it up at its next block boundary - the grid
+    never touches the pattern the sequencer is reading.
 */
 class StepGrid final : public juce::Component,
                        public juce::SettableTooltipClient
@@ -47,6 +49,10 @@ private:
     static void setNormalisedValue (int row, Step&, double t) noexcept;
 
     void setRatchetFromPointer (int step, juce::Point<float> position);
+    void shiftPitchOctave (int step, int direction);
+    void showPitchMenu (int step, juce::Rectangle<float> anchor);
+
+    void setPitch (int step, int note);
 
     SharedPattern& shared;
     int laneIndex = 0;
