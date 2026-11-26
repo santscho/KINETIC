@@ -136,7 +136,7 @@ say the same as the table below.
 | Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The lane's root note. The list always holds `C1` to `B1`; `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
 | Key | `C` … `B` | Key of the scale. |
-| Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC`, `CUSTOM` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
+| Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
 
 Step duration in quarter notes is `4 × numerator / denominator`, scaled by the modifier:
 `1/16` = 0.25, `1/4` = 1.0, `1/64` = 0.0625.
