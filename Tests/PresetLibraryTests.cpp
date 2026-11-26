@@ -23,6 +23,7 @@ public:
         testFactoryReset();
         testDelete();
         testIndexOfFileSurvivesASort();
+        testStoredFileNameFallsBackToFactory();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -174,6 +175,24 @@ private:
         // entry, and the factory entry itself is always entry 0.
         expectEquals (library.indexOfFile (alpha), -1);
         expectEquals (library.indexOfFile (juce::File()), 0);
+    }
+
+    void testStoredFileNameFallsBackToFactory()
+    {
+        beginTest ("A session's stored preset file name resolves, or falls back to factory");
+
+        auto library = makeLibrary ("stored-name");
+
+        juce::File saved;
+        expect (library.save (makePattern(), 0, "Saved", {}, &saved).wasOk());
+
+        expectEquals (presets::indexForFileName (library, saved.getFileName()), 1);
+
+        // Deleted or renamed since the session was saved.
+        expectEquals (presets::indexForFileName (library, "Gone.kineticpreset"), 0);
+
+        // A session that never used a preset.
+        expectEquals (presets::indexForFileName (library, {}), 0);
     }
 
     void testRename()
