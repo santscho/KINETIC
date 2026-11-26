@@ -71,7 +71,7 @@ private:
     RootNoteSelector rootNoteSelector;
 
     juce::TextButton scaleButton;
-    juce::ComboBox keyBox, scaleBox;
+    juce::ComboBox keyBox, scaleBox, meterBox;
 
     int laneIndex = 0;
 

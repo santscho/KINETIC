@@ -125,8 +125,8 @@ went by while it was off are skipped, not replayed.
 
 The row above the lane buttons holds the controls that apply to the whole pattern: `−` and `+`
 transpose the root note by octaves with the `OCT` readout beside them, then the scale aware switch
-with the key and mode it snaps to. The controls below the lane buttons apply to the lane being
-edited. None of them carry a text label; they are identified by position, left to right: the
+with the key and mode it snaps to, and at the right end the time signature the grid shades by.
+The controls below the lane buttons apply to the lane being edited. None of them carry a text label; they are identified by position, left to right: the
 step-length number box, then the division, modifier and direction choosers. Their tooltips say the
 same as the table below.
 
@@ -136,6 +136,7 @@ same as the table below.
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and mode beside it. |
 | Key | `C` … `B` | Key of the scale. |
 | Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
+| Beats per bar (rightmost chooser) | `1 BEAT` … `16 BEATS`, default `4 BEATS` | Time signature numerator, used by the grid's column shading: `3 BEATS` shades in threes for 3/4, `4 BEATS` in fours for 4/4. It changes no step timing — a step's length comes from the lane's division, which is a note value. |
 | Length (leftmost number box with +/−) | 1–64 | The lane's loop length. The grid always shows at least 16 columns and fits 32; a longer loop scrolls sideways. Columns past the loop length are dimmed and are not played. |
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
@@ -181,8 +182,9 @@ cell too narrow for the octave number shows just the note letter. The painted no
 step plays before scale aware quantises it, and the picker only offers in-scale notes while scale
 aware is on, so picking a note is enough to land on it.
 
-The columns are shaded in alternating groups of four, so beats are easy to follow. Step numbers
-appear in the header strip; when cells get narrow only every fourth number is drawn.
+The columns are shaded in alternating groups of the pattern's beats per bar — four by default,
+three for a 3/4 pattern — so bars are easy to follow in any meter. Step numbers appear in the
+header strip; when cells get narrow only every fourth number is drawn.
 
 A loop longer than 32 steps does not squeeze the cells: the columns keep the width they have at
 32 steps and the grid scrolls sideways, with a scroll bar along its bottom edge. The mouse wheel
