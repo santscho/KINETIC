@@ -218,7 +218,8 @@ channel it has used.
 The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE AS` `DEL`.
 
 - `‹` and `›` step through the list and wrap at either end; clicking the name opens the whole
-  list, with `Reveal folder in Finder` at the bottom.
+  list, with `Import presets…`, `Export this preset…`, `Export folder…` and `Reveal folder in
+  Finder` below it.
 - `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and writes a
   new file. Both store the whole pattern — all eight lanes with all 64 steps, plus the
   pattern-wide transpose, scale and meter — and the lane the editor was showing.
@@ -257,6 +258,14 @@ KINETIC presets are ignored rather than listed.
 
 Presets and the host session are independent: the session always stores the pattern itself, so a
 preset is a starting point and no session depends on a preset file still being there.
+
+**Moving presets between machines.** `Export this preset…` writes the selected preset to a
+`.kineticpreset` file wherever you choose, and `Export folder…` writes the whole folder to one
+`.kineticset` archive. `Import presets…` takes either — several at once — and copies the presets
+into the folder. Importing never overwrites: a preset whose name is already there arrives as
+`<name> version`, then `<name> version 2`, and so on, and the dialog reports how many were
+imported and which files were refused. An archive is the same per-preset documents collected
+under one `KINETIC_PRESETS` element, so a single preset can also be lifted out of one by hand.
 
 ---
 
