@@ -30,8 +30,11 @@ namespace
     /**
         The first thing in a category folder that a preset is not, described for a message.
 
-        Deleting a category removes its folder, so the folder may only hold presets: a note, a
-        rendering or a subfolder somebody left there keeps it, and the message names it.
+        A category folder belongs to the plug-in and holds presets. Renaming and deleting both act
+        on the folder itself - one moves it, the other removes it - so both ask this first: a note,
+        a rendering or a subfolder somebody left there keeps the folder where it is, and the
+        message names the item, because neither operation should move or remove a file the plug-in
+        did not write.
     */
     juce::String foreignItemIn (const juce::File& folder)
     {
@@ -52,6 +55,21 @@ namespace
         }
 
         return {};
+    }
+
+    /** `action` is what the caller wanted to do to the folder, so both messages read the same. */
+    juce::Result checkFolderHoldsOnlyPresets (const juce::File& folder, const juce::String& category,
+                                              const juce::String& action)
+    {
+        const auto foreign = foreignItemIn (folder);
+
+        if (foreign.isEmpty())
+            return juce::Result::ok();
+
+        return juce::Result::fail ("The folder of \"" + category + "\" still holds " + foreign
+                                   + ", which is not a preset. Only a folder that holds nothing "
+                                     "but presets can be " + action + ". Move it elsewhere in "
+                                     "Finder first.");
     }
 }
 
@@ -261,6 +279,13 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
     if (categoryDirectory (target).isDirectory())
         return juce::Result::fail ("\"" + target + "\" already exists.");
 
+    // Renaming moves the folder, and a file the plug-in did not write stays with it instead of
+    // being left in a folder that lags behind as an empty category, or being carried somewhere the
+    // user did not ask for: the rename is refused, exactly as deleting that folder would be.
+    if (const auto clean = checkFolderHoldsOnlyPresets (categoryDirectory (source), source, "renamed");
+        clean.failed())
+        return clean;
+
     // Every preset is read before anything is written, so a file that cannot be read fails the
     // rename with the folder still as it was.
     struct Pending
@@ -313,8 +338,8 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
     if (pending.empty())
         categoryDirectory (target).createDirectory();
 
-    // The old folder goes when nothing is left in it; a folder holding unrelated files stays, so
-    // renaming a category never deletes anything that is not a preset.
+    // The presets were the folder's only contents, so it is empty now. The emptiness check stays
+    // as a guard: nothing here may remove a file that is not one of ours.
     if (source != defaultCategoryName)
     {
         const auto folder = categoryDirectory (source);
@@ -346,11 +371,8 @@ juce::Result Library::deleteCategory (const juce::String& category)
 
     // The empty check above only looks at presets; anything else in the folder would be deleted
     // with it, so the folder is left alone and the reason names what is in the way.
-    if (const auto foreign = foreignItemIn (folder); foreign.isNotEmpty())
-        return juce::Result::fail ("The folder of \"" + category + "\" still holds " + foreign
-                                   + ", which is not a preset. Only a folder that holds nothing "
-                                     "but presets can be deleted. Move it elsewhere in Finder "
-                                     "first.");
+    if (const auto clean = checkFolderHoldsOnlyPresets (folder, category, "deleted"); clean.failed())
+        return clean;
 
     if (! folder.deleteRecursively() && folder.isDirectory())
         return juce::Result::fail ("The category folder could not be deleted.");

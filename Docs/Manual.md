@@ -273,12 +273,14 @@ then by name, so two categories may hold a preset of the same name.
 `Rename category…` renames a folder with every preset inside it: each preset keeps its name and
 its file name, so nothing that refers to it has to change — a project that was saved before the
 rename still opens on its preset, found by that file name. A name already in use is refused
-rather than merging two folders. `Delete empty category…` lists the categories that hold no
+rather than merging two folders, and a folder that holds anything besides presets — a note, a
+rendering, a subfolder — is refused as well, since moving a category is not a reason to move
+files the plug-in did not write. `Delete empty category…` lists the categories that hold no
 preset and removes the folder after asking; a category with presets in it has to be emptied with
-`Move to…` or `DEL` first, and the default category cannot be deleted. A folder that holds
-anything besides presets — a note, a rendering, a subfolder — is refused and the message names
-the item, so deleting a category never removes a file the plug-in did not write; move that item
-elsewhere in Finder and delete again.
+`Move to…` or `DEL` first, and the default category cannot be deleted. Deleting applies the same
+rule as renaming: a folder holding anything besides presets is refused, the message names the
+item, so a category operation never removes or moves a file the plug-in did not write; move that
+item elsewhere in Finder and try again.
 
 Presets and the host session are independent: the session always stores the pattern itself, so a
 preset is a starting point and no session depends on a preset file still being there.
