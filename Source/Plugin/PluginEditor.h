@@ -2,6 +2,7 @@
 
 #include "PatternEditor.h"
 #include "PluginProcessor.h"
+#include "PresetBar.h"
 
 namespace kinetic
 {
@@ -29,6 +30,7 @@ private:
 
     KineticAudioProcessor& audioProcessor;
     PatternEditor patternEditor;
+    PresetBar presetBar;
     juce::TextButton panicButton { "PANIC" };
     juce::Rectangle<int> footerArea;
     juce::TooltipWindow tooltipWindow { this, 600 };

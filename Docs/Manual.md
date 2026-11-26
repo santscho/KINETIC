@@ -23,7 +23,8 @@ It does **not**:
   can host it as an instrument and route its MIDI onward;
 - respond to MIDI input — notes played on a keyboard or drawn in the host's piano roll are
   ignored. The pattern in the editor is the only source of notes;
-- talk to the network, load samples, or use the filesystem.
+- talk to the network or load samples. Its only contact with the filesystem is the preset folder
+  (§4.6), which it reads when the list opens and writes only when you save or delete a preset.
 
 ---
 
@@ -91,7 +92,7 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ KINETIC                                              [ VST3 ] │
+│ KINETIC   PRESET < Name >          SAVE SAVEAS DEL  [ VST3 ] │
 │ − + OCT 3    SCALE ON    KEY C ▾    MODE MAJOR ▾              │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
 │ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾                │
@@ -109,7 +110,9 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 
 ### 4.1 Header
 
-The badge on the right shows the format the instance was built as (`AU MIDI FX` or `VST3`).
+The badge on the right shows the format the instance was built as (`AU MIDI FX` or `VST3`). To its
+left sits the preset browser (§4.6): `PRESET`, the two stepping arrows, the preset name, and
+`SAVE` / `SAVE AS` / `DEL`.
 
 ### 4.2 Lane buttons
 
@@ -209,6 +212,30 @@ loop length covers them.
 The footer updates 20 times a second. `PANIC` sends note-offs for every note KINETIC believes is
 held, then sustain-off (CC64), all-notes-off (CC123) and reset-all-controllers (CC121) on every
 channel it has used.
+
+### 4.6 Presets
+
+The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE AS` `DEL`.
+
+- `‹` and `›` step through the list and wrap at either end; clicking the name opens the whole
+  list, with `Reveal folder in Finder` at the bottom.
+- `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and writes a
+  new file. Both store the whole pattern — all eight lanes with all 64 steps, plus the
+  pattern-wide transpose, scale and meter — and the lane the editor was showing.
+- `DEL` asks first, then deletes the preset's file. The pattern in the editor is left as it is.
+- A `*` after the name means the pattern changed since it was loaded or saved. `SAVE` and
+  `SAVE AS` clear it.
+- The `FACTORY DEFAULT` entry is built in and cannot be saved over or deleted. Loading it restores
+  the default pattern with lane 1 playing, which is what a fresh instance starts with.
+
+Presets are plain XML files, one per preset, in `~/Library/Application Support/KINETIC/Presets`,
+with the extension `.kineticpreset`. A preset holds the same document the host keeps in its
+session, wrapped in a `KINETIC_PRESET` element that carries the format, its version and the name,
+so a preset can be read, edited, backed up or copied between machines by hand. Files that are not
+KINETIC presets are ignored rather than listed.
+
+Presets and the host session are independent: the session always stores the pattern itself, so a
+preset is a starting point and no session depends on a preset file still being there.
 
 ---
 
@@ -356,6 +383,9 @@ inside the host's session via the plug-in state. Notes:
 - A state that contains no pattern at all still loads; the current pattern remains.
 - Pressing play on a device whose state was never saved leaves the pattern in the editor only. If
   the pattern matters, save the host set.
+- Presets are separate files and are not part of the session: the session always holds the
+  pattern itself, so a session still opens if the preset it started from was deleted or moved
+  (§4.6).
 
 ---
 
