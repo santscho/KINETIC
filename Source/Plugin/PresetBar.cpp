@@ -240,12 +240,15 @@ void PresetBar::showMenu()
     menu.addSubMenu ("Export category...", exportMenu);
     menu.addItem (1004, "New category...");
 
+    // The default category is the preset folder itself and cannot be renamed, so it is not offered
+    // here; the submenu is disabled while it would hold nothing else.
     juce::PopupMenu renameMenu;
 
     for (int i = 0; i < categories.size(); ++i)
-        renameMenu.addItem (4001 + i, categories[i]);
+        if (categories[i] != presets::Library::defaultCategoryName)
+            renameMenu.addItem (4001 + i, categories[i]);
 
-    menu.addSubMenu ("Rename category...", renameMenu);
+    menu.addSubMenu ("Rename category...", renameMenu, renameMenu.getNumItems() > 0);
 
     // Only empty categories can be deleted, so the submenu lists exactly those and is disabled
     // while every category still holds a preset.

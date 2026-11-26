@@ -155,7 +155,8 @@ public:
 
         Refuses a name that is already in use rather than merging two folders, which is what
         importing is for. Like deleting, it refuses a folder that holds anything besides presets,
-        because moving a folder is not a reason to move files the plug-in did not write.
+        because moving a folder is not a reason to move files the plug-in did not write, and it
+        refuses the default category, which is the library root the other categories live in.
         `renamedTo` receives the name the category now has.
     */
     juce::Result renameCategory (const juce::String& from, const juce::String& to,
