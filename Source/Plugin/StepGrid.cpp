@@ -21,13 +21,13 @@ namespace
 
     /** The strip along the bottom of a RATCH cell that switches the ratchet off.
 
-        It takes a third of the cell so it grows into a comfortable click target when the
-        editor is enlarged, keeping a few pixels at small sizes and a ceiling so it never
-        swallows the ratchet level above it in a very tall row.
+        It takes a third of the cell at every size, so it stays a comfortable click target when
+        the editor is enlarged, with a small floor for the shortest rows. The ratchet level
+        above it keeps the other two thirds.
     */
     juce::Rectangle<float> ratchetClearStrip (juce::Rectangle<float> cell) noexcept
     {
-        const auto height = juce::jlimit (5.0f, 22.0f, cell.getHeight() * 0.34f);
+        const auto height = juce::jmax (5.0f, cell.getHeight() * 0.34f);
         return cell.withTop (cell.getBottom() - height).reduced (1.0f, 0.5f);
     }
 } // namespace
@@ -269,7 +269,7 @@ void StepGrid::paint (juce::Graphics& g)
                     g.setColour (hasRatchet ? theme::background.withAlpha (0.95f)
                                             : theme::muted.withAlpha (dim * 0.85f));
                     g.fillRect (strip.withSizeKeepingCentre (
-                        juce::jmin (strip.getWidth() * 0.6f, 11.0f),
+                        juce::jmax (7.0f, strip.getWidth() * 0.22f),
                         juce::jmax (1.0f, std::round (strip.getHeight() * 0.2f))));
                     break;
                 }
