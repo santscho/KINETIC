@@ -184,7 +184,7 @@ aware is on, so picking a note is enough to land on it.
 
 The columns are shaded in alternating groups of the pattern's beats per bar — four by default,
 three for a 3/4 pattern — so bars are easy to follow in any meter. Step numbers appear in the
-header strip; when cells get narrow only every fourth number is drawn.
+header strip; when cells get narrow only the first step of each bar is numbered.
 
 A loop longer than 32 steps does not squeeze the cells: the columns keep the width they have at
 32 steps and the grid scrolls sideways, with a scroll bar along its bottom edge. The mouse wheel

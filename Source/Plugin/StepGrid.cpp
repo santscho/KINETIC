@@ -376,8 +376,9 @@ void StepGrid::paint (juce::Graphics& g)
     juce::Graphics::ScopedSaveState clipped (g);
     g.reduceClipRegion (area.withTop (0));
 
-    // Step numbers in the header strip above the rows; every fourth one when they are narrow.
-    const auto labelEvery = columnWidth >= 16.0f ? 1 : 4;
+    // Step numbers in the header strip above the rows; when they are narrow, only the first
+    // step of each bar is numbered, so the numbering follows the meter like the shading does.
+    const auto labelEvery = columnWidth >= 16.0f ? 1 : beatGroup;
 
     if (columnWidth >= 8.0f)
     {
