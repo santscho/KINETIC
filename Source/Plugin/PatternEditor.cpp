@@ -25,14 +25,6 @@ namespace
     const juce::StringArray scaleNames { "CHROMATIC", "MAJOR", "MINOR", "DORIAN",
                                          "PHRYGIAN DOM", "PENTATONIC" };
 
-    // C3 is note 60, the naming the manual and every host use.
-    juce::String noteName (int note)
-    {
-        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F",
-                                             "F#", "G", "G#", "A", "A#", "B" };
-
-        return juce::String (names[note % 12]) + juce::String (note / 12 - 2);
-    }
 } // namespace
 
 PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& selectedLaneRef)
@@ -271,7 +263,7 @@ void PatternEditor::resized()
     controls.removeFromLeft (10);
     directionBox.setBounds (controls.removeFromLeft (136));
     controls.removeFromLeft (10);
-    rootNoteSelector.setBounds (controls.removeFromLeft (168));
+    rootNoteSelector.setBounds (controls.removeFromLeft (104));
 
     area.removeFromTop (6);
 
@@ -296,22 +288,6 @@ PatternEditor::RootNoteSelector::RootNoteSelector()
 
     addAndMakeVisible (downButton);
     addAndMakeVisible (upButton);
-
-    noteBox.setTooltip ("Root note of this lane, C1 to B1; the buttons set its octave");
-    noteBox.onChange = [this]
-    {
-        const auto base = note - (note % 12);
-        const auto selected = juce::jlimit (0, 11, noteBox.getSelectedId() - 1);
-
-        note = juce::jlimit (0, 127, base + selected);
-        repaint();
-
-        if (onNoteChange != nullptr)
-            onNoteChange (note);
-    };
-    addAndMakeVisible (noteBox);
-
-    rebuildItems();
 }
 
 void PatternEditor::RootNoteSelector::paint (juce::Graphics& g)
@@ -331,46 +307,30 @@ void PatternEditor::RootNoteSelector::paint (juce::Graphics& g)
 void PatternEditor::RootNoteSelector::resized()
 {
     auto area = getLocalBounds();
-    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 6);
+    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 4);
 
     downButton.setBounds (area.removeFromLeft (buttonWidth).reduced (0, 1));
     upButton.setBounds (area.removeFromLeft (buttonWidth).reduced (1, 1));
 
-    octaveArea = area.removeFromRight (46).reduced (2, 1);
-    noteBox.setBounds (area.reduced (2, 0));
+    octaveArea = area.reduced (4, 1);
 }
 
 void PatternEditor::RootNoteSelector::setNote (int newNote)
 {
     note = juce::jlimit (0, 127, newNote);
-    rebuildItems();
-}
-
-void PatternEditor::RootNoteSelector::rebuildItems()
-{
-    // The list is always C1 to B1. The octave is not part of the entries: the buttons move it and
-    // the readout next to the list shows it, so a root of C3 reads `C1` with `OCT 3`.
-    noteBox.clear (juce::dontSendNotification);
-
-    for (int i = 0; i < 12; ++i)
-        noteBox.addItem (noteName (36 + i), i + 1);
-
-    noteBox.setSelectedId ((note % 12) + 1, juce::dontSendNotification);
-
     repaint();
 }
 
 void PatternEditor::RootNoteSelector::shiftOctave (int direction)
 {
-    // Refused rather than clamped at the ends: clamping would move the note off its letter, so
-    // C8 would turn into G8 when there is no C9.
+    // Refused rather than clamped at the ends, so the root keeps its note letter at the top.
     const auto shifted = note + 12 * direction;
 
     if (shifted < 0 || shifted > 127)
         return;
 
     note = shifted;
-    rebuildItems();
+    repaint();
 
     if (onNoteChange != nullptr)
         onNoteChange (note);
