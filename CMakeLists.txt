@@ -21,7 +21,7 @@
 cmake_minimum_required (VERSION 3.22)
 
 project (KINETIC
-    VERSION 0.6.0
+    VERSION 0.7.0
     DESCRIPTION "KINETIC - sample-accurate pure MIDI FX sequencer, licensed under the GNU General Public License v3.0 (GPLv3)"
     LANGUAGES C CXX OBJC OBJCXX)
 
