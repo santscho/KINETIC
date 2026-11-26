@@ -164,7 +164,7 @@ Seven rows, one column per step. `VEL`, `MOD` and `GATE` are knobs; `PITCH` is a
 | `VEL` | Knob, turned by dragging up or down | 0–127, default 100 |
 | `MOD` | Knob, turned by dragging up or down | 0–127, default 64 |
 | `GATE` | Knob, turned by dragging up or down | 2–100 % of the step, default 50 % |
-| `RATCH` | Pointer height; the `-` strip at the bottom of the cell switches it off | 1–8 sub-triggers per step |
+| `RATCH` | Pointer height above the `-` strip; the strip switches it off | x2–x8 sub-triggers per step, x2 lowest and the default |
 | `SLIDE` | Click or drag toggles | on / off |
 
 `TRIG` and `SLIDE` toggle based on the cell you first touched in the gesture, so a drag across a
@@ -317,7 +317,8 @@ Per step: micro timing −50…+50 % of the step, probability 0–100 % (evaluat
 Ratchet counts are edited in the grid's `RATCH` row, where the strip along the bottom of a cell
 switches the ratchet off (one ratchet) instead of making you aim at the lowest eighth of the cell.
 The strip takes about a third of the row, so it grows into a comfortable target when the editor is
-enlarged.
+enlarged. The factors `x2`–`x8` share the band above the strip in seven even zones, so `x2`, the
+default, is the zone directly on top of the strip and `x8` is at the top of the cell.
 Micro timing, probability and the ratchet velocity ramp are still state-format only.
 ---
 
