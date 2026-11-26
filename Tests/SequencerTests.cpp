@@ -453,6 +453,23 @@ public:
                 expectEquals (math::quantise (note, chromatic, 0), note);
         }
 
+        beginTest ("Each named mode uses its own pitch classes");
+        {
+            // Phrygian dominant is the fifth mode of harmonic minor: 0 1 4 5 7 8 10.
+            const auto phrygianDominant = math::scaleMask (ScaleType::phrygianDominant, 0);
+
+            for (int note = 0; note < 12; ++note)
+            {
+                const int expected = (note == 0 || note == 1 || note == 4 || note == 5
+                                        || note == 7 || note == 8 || note == 10) ? 1 : 0;
+
+                expectEquals (static_cast<int> ((phrygianDominant >> note) & 1), expected);
+            }
+
+            expectEquals (math::quantise (63, phrygianDominant, 0), 64);   // D# -> E
+            expectEquals (math::quantise (66, phrygianDominant, 0), 67);   // F# ties between F and G, up
+        }
+
         beginTest ("Custom mask is respected");
         {
             const auto custom = math::scaleMask (ScaleType::custom, 0x0011);   // C and E only
@@ -782,6 +799,45 @@ public:
 
             // And it keeps time from there rather than carrying the backlog forward.
             expectEquals (countNoteOns (rig.run (1.0)), 4);
+        }
+
+        beginTest ("Scale aware snaps generated notes to the key");
+        {
+            Rig rig;
+            auto& pattern = rig.pattern();
+            pattern.scaleEnabled = true;
+            pattern.globalScale = ScaleType::major;
+            pattern.globalRoot = 0;
+
+            auto& lane = setupLane (pattern, 0, 4, { 1, 8, ClockModifier::straight });
+            lane.steps[0].pitch = 1;        // C# -> D
+            lane.steps[1].pitch = 3;        // D# -> E
+            lane.steps[2].pitch = 0;
+            lane.steps[3].pitch = 0;
+
+            expect (noteOnPitches (rig.run (1.9)) == juce::Array<int> { 62, 64, 60, 60 });
+        }
+
+        beginTest ("With scale aware off the painted pitch is played exactly");
+        {
+            Rig rig;
+            auto& pattern = rig.pattern();
+            pattern.scaleEnabled = false;
+            pattern.globalScale = ScaleType::major;      // set, but switched off
+            pattern.globalRoot = 0;
+
+            auto& lane = setupLane (pattern, 0, 4, { 1, 8, ClockModifier::straight });
+            lane.steps[0].pitch = 1;
+            lane.steps[1].pitch = 3;
+
+            const auto pitches = noteOnPitches (rig.run (0.9));
+            expectEquals (pitches.size(), 2);
+
+            if (pitches.size() == 2)
+            {
+                expectEquals (pitches[0], 61);
+                expectEquals (pitches[1], 63);
+            }
         }
 
         beginTest ("An adopted pattern is played by reference, not copied");

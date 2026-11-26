@@ -94,6 +94,7 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 │ KINETIC                                              [ VST3 ] │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
 │ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾ − + C1 ▾ OCT 3 │
+│ SCALE ON    KEY C ▾    MODE MAJOR ▾                           │
 │  1   2   3   4   5   6   7   8   9  10 …                      │
 │ TRIG  █       █                                               │
 │ PITCH                                                         │
@@ -133,6 +134,9 @@ say the same as the table below.
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
 | Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The lane's root note. The list always holds `C1` to `B1`; `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
+| Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
+| Key | `C` … `B` | Key of the scale. |
+| Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC`, `CUSTOM` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
 
 Step duration in quarter notes is `4 × numerator / denominator`, scaled by the modifier:
 `1/16` = 0.25, `1/4` = 1.0, `1/64` = 0.0625.
@@ -244,10 +248,17 @@ state-format only.
 
 ### 6.3 Scales
 
-Global and per-lane. `chromatic` (default), `major`, `minor`, `dorian`, `phrygianDominant`,
-`pentatonic`, and `custom` with a 12-bit mask (C = bit 0, default `0x0fff`). A lane uses the
-global scale and root unless `useGlobalScale` is cleared, in which case it uses its own scale and
-root. Quantisation snaps the note to the nearest allowed pitch class, resolving ties upward.
+Scale aware is the switch in the editor's second control row. With it on, every generated note is
+snapped to the chosen key and mode **when the step fires**; with it off, which is the default, the
+painted pitch is played exactly. A note that is already sounding is never retuned, so changing the
+key, the mode or the switch cannot make a held note jump — the change takes effect with the next
+trigger.
+
+The modes are `chromatic`, `major`, `minor`, `dorian`, `phrygianDominant`, `pentatonic` and
+`custom` with a 12-bit mask (C = bit 0, default `0x0fff`). The key is one of the twelve pitch
+classes. A lane uses the global key and mode unless `useGlobalScale` is cleared, in which case it
+uses its own `scale` and `scaleRoot`; the switch gates both. Quantisation picks the nearest allowed
+pitch class and resolves ties upward, so `F#` in C major becomes `G`.
 
 ### 6.4 Sub-lane loop lengths
 
@@ -401,8 +412,8 @@ The AU can be validated with `auval -v aumi Kntk Kntc`.
 - The AU has no direct MIDI out in Ableton Live (an AU-format restriction, not a KINETIC one);
   use the VST3 there. In Logic, the AU is meant for the MIDI FX slot.
 - MIDI input is accepted for host compatibility but ignored.
-- Editor controls for lane type, channel, scales, Euclidean generation, slide mode, accent values
-  and the non-trigger sub-lane lengths are not built yet (§6).
+- Editor controls for lane type, channel, Euclidean generation, slide mode, accent values, the
+  non-trigger sub-lane lengths and a custom scale mask are not built yet (§6).
 - One pattern per instance; there are no pattern slots or chaining.
 - No undo/redo in the editor. Host undo does not cover pattern edits.
 - Tempo changes are followed from host PPQ, but there is no independent tempo setting.

@@ -124,6 +124,10 @@ struct Lane
 struct Pattern
 {
     std::array<Lane, maxLanes> lanes {};
+
+    // Scale aware: every generated note is snapped to the key and scale below. Off by default,
+    // so an untouched pattern plays the painted pitches exactly.
+    bool scaleEnabled = false;
     ScaleType globalScale = ScaleType::chromatic;
     int globalRoot = 0;
     juce::uint16 customScaleMask = 0x0fff;

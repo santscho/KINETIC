@@ -72,6 +72,9 @@ private:
     juce::ComboBox dividerBox, modifierBox, directionBox;
     RootNoteSelector rootNoteSelector;
 
+    juce::TextButton scaleButton;
+    juce::ComboBox keyBox, scaleBox;
+
     int laneIndex = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PatternEditor)

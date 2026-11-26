@@ -13,6 +13,18 @@ namespace
     const juce::StringArray directionNames { "FORWARD", "REVERSE", "PING-PONG",
                                              "PENDULUM", "RANDOM WALK" };
 
+    const juce::StringArray keyNames { "C", "C#", "D", "D#", "E", "F",
+                                       "F#", "G", "G#", "A", "A#", "B" };
+
+    // Display order of the scales, which is not the enum order the state format stores.
+    constexpr ScaleType scaleOrder[] = { ScaleType::chromatic, ScaleType::major, ScaleType::minor,
+                                         ScaleType::dorian, ScaleType::phrygianDominant,
+                                         ScaleType::pentatonic, ScaleType::custom };
+    constexpr int numScaleTypes = static_cast<int> (sizeof (scaleOrder) / sizeof (scaleOrder[0]));
+
+    const juce::StringArray scaleNames { "CHROMATIC", "MAJOR", "MINOR", "DORIAN",
+                                         "PHRYGIAN DOM", "PENTATONIC", "CUSTOM" };
+
     // C3 is note 60, the naming the manual and every host use.
     juce::String noteName (int note)
     {
@@ -118,6 +130,42 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
     };
     addAndMakeVisible (rootNoteSelector);
 
+    // Scale aware: one switch for the whole pattern, then the key and the scale it snaps to.
+    scaleButton.setClickingTogglesState (true);
+    scaleButton.setColour (juce::TextButton::buttonOnColourId, theme::accent);
+    scaleButton.setColour (juce::TextButton::textColourOnId, theme::background);
+    scaleButton.setTooltip ("Scale aware: snap every generated note to the key and scale below");
+    scaleButton.onClick = [this]
+    {
+        shared.edit().scaleEnabled = scaleButton.getToggleState();
+        commit();
+        refreshControls();
+    };
+    addAndMakeVisible (scaleButton);
+
+    for (int i = 0; i < keyNames.size(); ++i)
+        keyBox.addItem (keyNames[i], i + 1);
+
+    keyBox.setTooltip ("Key every generated note is snapped to");
+    keyBox.onChange = [this]
+    {
+        shared.edit().globalRoot = juce::jlimit (0, 11, keyBox.getSelectedId() - 1);
+        commit();
+    };
+    addAndMakeVisible (keyBox);
+
+    for (int i = 0; i < numScaleTypes; ++i)
+        scaleBox.addItem (scaleNames[i], i + 1);
+
+    scaleBox.setTooltip ("Scale every generated note is snapped to");
+    scaleBox.onChange = [this]
+    {
+        const auto index = juce::jlimit (0, numScaleTypes - 1, scaleBox.getSelectedId() - 1);
+        shared.edit().globalScale = scaleOrder[index];
+        commit();
+    };
+    addAndMakeVisible (scaleBox);
+
     // A pattern with no enabled lane is silent, so open on something that can play.
     bool anyEnabled = false;
 
@@ -178,6 +226,21 @@ void PatternEditor::refreshControls()
     modifierBox.setSelectedId (modifierId, juce::dontSendNotification);
     directionBox.setSelectedId (static_cast<int> (settings.direction) + 1, juce::dontSendNotification);
     rootNoteSelector.setNote (settings.rootNote);
+
+    const auto& pattern = shared.edit();
+
+    scaleButton.setToggleState (pattern.scaleEnabled, juce::dontSendNotification);
+    scaleButton.setButtonText (pattern.scaleEnabled ? "SCALE ON" : "SCALE OFF");
+
+    keyBox.setSelectedId (juce::jlimit (0, 11, pattern.globalRoot) + 1, juce::dontSendNotification);
+
+    auto scaleId = 1;
+
+    for (int i = 0; i < numScaleTypes; ++i)
+        if (scaleOrder[i] == pattern.globalScale)
+            scaleId = i + 1;
+
+    scaleBox.setSelectedId (scaleId, juce::dontSendNotification);
 }
 
 void PatternEditor::commit()
@@ -209,6 +272,15 @@ void PatternEditor::resized()
     directionBox.setBounds (controls.removeFromLeft (136));
     controls.removeFromLeft (10);
     rootNoteSelector.setBounds (controls.removeFromLeft (168));
+
+    area.removeFromTop (6);
+
+    auto scaleRow = area.removeFromTop (24);
+    scaleButton.setBounds (scaleRow.removeFromLeft (100).reduced (0, 1));
+    scaleRow.removeFromLeft (8);
+    keyBox.setBounds (scaleRow.removeFromLeft (66));
+    scaleRow.removeFromLeft (6);
+    scaleBox.setBounds (scaleRow.removeFromLeft (152));
 
     area.removeFromTop (8);
     grid.setBounds (area);
