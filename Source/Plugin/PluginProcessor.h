@@ -46,6 +46,11 @@ public:
     // The host's program list is the preset folder: one program per preset file with the factory
     // reset first. Recalling a program is the same operation as choosing a preset in the editor's
     // header, so the host menu, the header and the pattern in the session cannot drift apart.
+    //
+    // The names are live - the folder is re-read when it changed since the last query - but the
+    // VST3 wrapper builds its Program parameter once, at instantiation, from getNumPrograms(),
+    // so a preset added later is outside that parameter's range until the plug-in is reloaded.
+    // Nothing on this side can move it; see Docs/Manual.md 4.6.
     int getNumPrograms() override;
     int getCurrentProgram() override;
     void setCurrentProgram (int index) override;
@@ -115,6 +120,9 @@ private:
     void updateProgramNames();
     int programIndexForFile (const juce::File& file) const;
 
+    /** Picks up presets added or removed outside the editor, so the host's list stays current. */
+    void refreshPresetListIfStale();
+
     kinetic::TransportEngine engine;
     kinetic::SharedPattern sharedPattern;
     std::atomic<int> selectedLane { 0 };
@@ -127,6 +135,11 @@ private:
     std::atomic<int> currentProgram { 0 };
     juce::StringArray programNames;
     mutable juce::CriticalSection programLock;
+
+    // Message thread only: the folder's timestamp when the names were last read, and when they
+    // were last checked, so a host polling its list cannot turn into a folder scan per query.
+    juce::Time folderStamp;
+    juce::uint32 lastPresetScanMs = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessor)
 };
