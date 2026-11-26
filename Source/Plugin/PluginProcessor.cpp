@@ -196,6 +196,8 @@ void KineticAudioProcessor::setStateInformation (const void* data, int sizeInByt
 
 int KineticAudioProcessor::getNumPrograms()
 {
+    refreshPresetListIfStale();
+
     const juce::ScopedLock lock (programLock);
 
     return juce::jmax (1, programNames.size());
@@ -211,6 +213,8 @@ int KineticAudioProcessor::getCurrentProgram()
 
 const juce::String KineticAudioProcessor::getProgramName (int index)
 {
+    refreshPresetListIfStale();
+
     const juce::ScopedLock lock (programLock);
 
     if (index < 0)      // the AudioProcessor contract allows -1 for the current program
@@ -232,12 +236,39 @@ void KineticAudioProcessor::changeProgramName (int index, const juce::String& ne
         juce::Logger::writeToLog ("KINETIC: " + result.getErrorMessage());
 }
 
+void KineticAudioProcessor::refreshPresetListIfStale()
+{
+    // Hosts ask for their program list on their own UI thread, which is this one. Noticing a
+    // folder that changed since the plug-in loaded is what lets that list follow presets added
+    // from the editor or from the Finder: the AU rebuilds its factory preset menu from it, and
+    // the VST3 program list is read from it. A folder timestamp keeps this to one file stat per
+    // half second instead of a scan per query.
+    if (! juce::MessageManager::existsAndIsCurrentThread())
+        return;
+
+    const auto now = juce::Time::getMillisecondCounter();
+
+    if (now - lastPresetScanMs < 500)
+        return;
+
+    lastPresetScanMs = now;
+
+    if (presetLibrary.directory().getLastModificationTime() == folderStamp)
+        return;
+
+    presetLibrary.reload();
+    updateProgramNames();
+}
+
 void KineticAudioProcessor::updateProgramNames()
 {
     juce::StringArray names;
 
     for (const auto& entry : presetLibrary.entries())
         names.add (entry.name);
+
+    // Recorded before the lock so a host thread never touches the folder.
+    folderStamp = presetLibrary.directory().getLastModificationTime();
 
     const juce::ScopedLock lock (programLock);
 

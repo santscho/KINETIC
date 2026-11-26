@@ -232,8 +232,22 @@ The same folder is the plug-in's **program list**: the host's preset or program 
 `FACTORY DEFAULT` and every preset, in the order the header uses. Choosing a program there loads
 it exactly like choosing it in the header, and the header follows a program the host recalls.
 Saving, renaming or deleting a preset refreshes the host's list, and a host's rename renames the
-file too. Hosts built on a project that only allows one program still see the single-program case
-with no presets saved.
+file too. The folder is also checked again whenever the host asks for its list, so a preset added
+from the Finder appears without reopening the plug-in.
+
+**What the host's menu can and cannot follow.**
+
+- **AU (Logic, MainStage).** The factory-preset menu is rebuilt from the folder every time the
+  host asks for it, and the plug-in announces a program change after a save, a delete, a rename
+  or a session load, so the AU's current preset follows the header.
+- **VST3 (Live, Cubase, Studio One…).** The program *list* is read from the folder too, but the
+  VST3 `Program` parameter is built once, when the plug-in is instantiated, and its range is
+  fixed at that moment. Presets added afterwards appear in the list of hosts that re-read it and
+  can always be loaded from the header, but they stay outside that parameter's range until the
+  plug-in is removed and re-inserted. For the same reason, a folder that was empty when the
+  plug-in loaded has no `Program` parameter at all.
+- Keeping the folder unchanged while a project is open avoids the question entirely; adding
+  presets is safest before inserting the plug-in, or reload the plug-in afterwards.
 
 Presets are plain XML files, one per preset, in `~/Library/Application Support/KINETIC/Presets`,
 with the extension `.kineticpreset`. A preset holds the same document the host keeps in its
