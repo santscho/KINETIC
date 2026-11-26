@@ -219,6 +219,18 @@ void PresetBar::showMenu()
     importMenu.addItem (1012, "Skip Existing Presets");
     menu.addSubMenu ("Import presets...", importMenu);
 
+    // Moving is offered for every category but the one the preset is already in, so the submenu
+    // is a list of destinations rather than a list with one entry that does nothing.
+    const auto shownCategory = currentCategory();
+    juce::PopupMenu moveMenu;
+
+    for (int i = 0; i < categories.size(); ++i)
+        if (categories[i] != shownCategory)
+            moveMenu.addItem (3001 + i, categories[i]);
+
+    menu.addSubMenu ("Move to...", moveMenu,
+                     ! factorySelected && moveMenu.getNumItems() > 0);
+
     juce::PopupMenu exportMenu;
 
     for (int i = 0; i < categories.size(); ++i)
@@ -262,6 +274,12 @@ void PresetBar::showMenu()
                             if (result >= 2001 && result <= 2000 + categories.size())
                             {
                                 safeThis->exportCategory (categories[result - 2001]);
+                                return;
+                            }
+
+                            if (result >= 3001 && result <= 3000 + categories.size())
+                            {
+                                safeThis->moveToCategory (categories[result - 3001]);
                                 return;
                             }
 
@@ -376,6 +394,22 @@ void PresetBar::promptNewCategory()
 
                                     safeThis->reloadLibrary();
                                 }), true);
+}
+
+void PresetBar::moveToCategory (const juce::String& category)
+{
+    if (const auto moved = processor.movePreset (currentIndexOrFactory(), category); moved.failed())
+    {
+        showError (moved.getErrorMessage());
+        return;
+    }
+
+    // It is still the same preset, so the pattern and the modified marker stay as they are; only
+    // its place in the list changed. The processor has already moved the program with it, which
+    // is also what the session stores.
+    currentIndex = processor.getCurrentProgram();
+    refreshName();
+    repaint();
 }
 
 void PresetBar::saveAs (const juce::String& name, const juce::String& category)

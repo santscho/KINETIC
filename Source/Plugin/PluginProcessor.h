@@ -80,6 +80,9 @@ public:
 
     juce::Result createCategory (const juce::String& name);
 
+    /** Moves preset `index` into `category`, keeping the current program on that preset. */
+    juce::Result movePreset (int index, const juce::String& category);
+
     juce::Result deletePreset (int index);
     juce::Result renamePreset (int index, const juce::String& newName);
 

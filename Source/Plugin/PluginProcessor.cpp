@@ -393,6 +393,37 @@ juce::Result KineticAudioProcessor::deletePreset (int index)
     return juce::Result::ok();
 }
 
+juce::Result KineticAudioProcessor::movePreset (int index, const juce::String& category)
+{
+    const auto entries = presetLibrary.entries();
+
+    if (! juce::isPositiveAndBelow (index, entries.size()))
+        return juce::Result::fail ("That preset is no longer in the folder.");
+
+    if (entries[index].isFactory)
+        return juce::Result::fail ("The factory preset cannot be moved.");
+
+    // The list re-sorts by category, so the file is what the current program follows - and when
+    // the preset being moved is the current one, that is the new file, not the one just removed.
+    const auto current = currentProgram.load (std::memory_order_relaxed);
+    const auto currentFile = juce::isPositiveAndBelow (current, entries.size())
+                                 ? entries[current].file
+                                 : juce::File();
+    const auto movingCurrent = entries[index].file == currentFile;
+
+    juce::File moved;
+
+    if (const auto result = presetLibrary.moveToCategory (entries[index], category, &moved);
+        result.failed())
+        return result;
+
+    updateProgramNames();
+    currentProgram.store (programIndexForFile (movingCurrent ? moved : currentFile),
+                          std::memory_order_relaxed);
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    return juce::Result::ok();
+}
+
 presets::Library::ImportSummary KineticAudioProcessor::importPresets (
     const juce::Array<juce::File>& sources, presets::Library::ImportPolicy policy,
     const juce::String& fallbackCategory)

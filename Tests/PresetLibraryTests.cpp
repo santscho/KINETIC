@@ -25,6 +25,7 @@ public:
         testIndexOfFileSurvivesASort();
         testStoredFileNameFallsBackToFactory();
         testCategoryPresetSurvivesReopening();
+        testMoveToCategory();
         testFolderChangesArePickedUp();
         testExportAndImport();
         testImportPolicies();
@@ -475,6 +476,46 @@ private:
         // A category with nothing in it has nothing to archive.
         expect (library.createCategory ("Empty").wasOk());
         expect (library.exportArchive (temp.getChildFile ("Empty.kineticset"), "Empty").failed());
+    }
+
+    void testMoveToCategory()
+    {
+        beginTest ("A preset moves to another category and keeps its name");
+
+        auto library = makeLibrary ("move");
+        expect (library.createCategory ("Bass").wasOk());
+
+        juce::File file;
+        expect (library.save (makePattern(), 2, "Line", {}, &file).wasOk());
+
+        const auto index = library.indexOfFile (file);
+        expect (index > 0);
+
+        juce::File moved;
+        expect (library.moveToCategory (library.entries()[index], "Bass", &moved).wasOk());
+
+        // Moved, not copied: the file lives in the category and the old one is gone.
+        expect (moved.getParentDirectory() == library.directory().getChildFile ("Bass"));
+        expect (! file.existsAsFile());
+        expectEquals (library.entries().size(), 2);
+
+        const auto movedIndex = library.indexOfFile (moved);
+        expect (movedIndex > 0);
+        expectEquals (library.entries()[movedIndex].name, juce::String ("Line"));
+        expectEquals (library.entries()[movedIndex].category, juce::String ("Bass"));
+
+        // The pair a session stores still names the preset after the move.
+        expectEquals (library.indexForFileName (moved.getFileName(), "Bass"), movedIndex);
+
+        Pattern loaded;
+        int lane = 0;
+        expect (library.load (library.entries()[movedIndex], loaded, lane));
+        expectEquals (loaded.rootNote, 67);
+        expectEquals (lane, 2);
+
+        // Moving a preset to the category it is already in changes nothing.
+        expect (library.moveToCategory (library.entries()[movedIndex], "Bass", &moved).wasOk());
+        expectEquals (library.entries().size(), 2);
     }
 
     void testRename()

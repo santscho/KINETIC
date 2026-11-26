@@ -52,6 +52,7 @@ private:
     void saveAs (const juce::String& name, const juce::String& category);
     void confirmDelete();
     void promptNewCategory();
+    void moveToCategory (const juce::String& category);
     void importPresets (presets::Library::ImportPolicy policy);
     void exportCurrentPreset();
     void exportCategory (const juce::String& category);
