@@ -390,10 +390,10 @@ inside the host's session via the plug-in state. Notes:
 - A state that contains no pattern at all still loads; the current pattern remains.
 - Pressing play on a device whose state was never saved leaves the pattern in the editor only. If
   the pattern matters, save the host set.
-- Presets are separate files and are not part of the session: the session always holds the
-  pattern itself, so a session still opens if the preset it started from was deleted or moved
-  (§4.6). The host's program selection is not stored either — the pattern is what a reopened
-  session plays, whatever the preset folder looks like by then.
+- The session also remembers which preset it was using, so reopening a project shows that
+  preset in the header and in the host's program menu. Only the preset's file name is stored: if
+  it has been deleted or renamed since, the project opens on `FACTORY DEFAULT` and still plays
+  the pattern it saved, which is part of the session itself (§4.6).
 
 ---
 

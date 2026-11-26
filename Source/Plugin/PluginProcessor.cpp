@@ -142,6 +142,14 @@ void KineticAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // Read the message-thread copy, which is the one the editor writes.
     kinetic::patternstate::writeToXml (sharedPattern.edit(), selectedLane.load(), state);
 
+    // Which preset the session was using, stored by file name: entry numbers move when the
+    // folder changes, a file name stays attached to its preset.
+    const auto& entries = presetLibrary.entries();
+    const auto program = currentProgram.load (std::memory_order_relaxed);
+
+    if (juce::isPositiveAndBelow (program, entries.size()) && ! entries[program].isFactory)
+        state.setAttribute ("preset", entries[program].file.getFileName());
+
     copyXmlToBinary (state, destData);
 }
 
@@ -165,6 +173,18 @@ void KineticAudioProcessor::setStateInformation (const void* data, int sizeInByt
             selectedLane.store (lane);
             patternRevision.fetch_add (1, std::memory_order_relaxed);
         }
+
+        // The header and the host both name the preset the project was saved with. It is looked
+        // up by file name, so a folder that changed in the meantime falls back to the factory
+        // entry rather than naming whichever preset now sits at that number. The pattern itself
+        // has already been restored either way.
+        presetLibrary.reload();
+        currentProgram.store (presets::indexForFileName (presetLibrary,
+                                                         xml->getStringAttribute ("preset")),
+                              std::memory_order_relaxed);
+        updateProgramNames();
+        updateHostDisplay (
+            juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
     }
 }
 

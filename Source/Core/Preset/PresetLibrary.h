@@ -93,4 +93,21 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Library)
 };
 
+/**
+    The entry a stored file name refers to, or 0 when it no longer exists.
+
+    A session saves the preset it was using as a file name rather than an entry number, so a
+    folder that gained, lost or renamed presets in between still resolves to the right preset, and
+    a preset that has been deleted falls back to the factory entry.
+*/
+inline int indexForFileName (const Library& library, const juce::String& fileName)
+{
+    if (fileName.isEmpty())
+        return 0;
+
+    const auto index = library.indexOfFile (library.directory().getChildFile (fileName));
+
+    return index >= 0 ? index : 0;
+}
+
 } // namespace kinetic::presets
