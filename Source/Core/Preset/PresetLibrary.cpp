@@ -319,6 +319,47 @@ juce::Result Library::rename (const Entry& entry, const juce::String& newName,
     return juce::Result::ok();
 }
 
+juce::Result Library::moveToCategory (const Entry& entry, const juce::String& category,
+                                      juce::File* movedFile)
+{
+    if (entry.isFactory)
+        return juce::Result::fail ("The factory preset cannot be moved.");
+
+    const auto destination = category.isEmpty() ? juce::String (defaultCategoryName) : category;
+
+    if (destination == entry.category)
+    {
+        // Already there: nothing to write, and nothing to remove.
+        if (movedFile != nullptr)
+            *movedFile = entry.file;
+
+        return juce::Result::ok();
+    }
+
+    Pattern pattern;
+    auto lane = 0;
+
+    if (! load (entry, pattern, lane))
+        return juce::Result::fail ("The preset could not be read.");
+
+    // Written into the destination before the old file goes, so a failed write cannot lose the
+    // pattern. The name is kept; only the file name becomes unique when that name is taken there.
+    juce::File target;
+
+    if (const auto result = save (pattern, lane, entry.name, {}, &target, destination);
+        result.failed())
+        return result;
+
+    if (target != entry.file)
+        entry.file.deleteFile();
+
+    if (movedFile != nullptr)
+        *movedFile = target;
+
+    reload();
+    return juce::Result::ok();
+}
+
 juce::Result Library::exportPreset (const Entry& entry, const juce::File& target) const
 {
     if (entry.isFactory)

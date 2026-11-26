@@ -219,8 +219,13 @@ The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE 
 
 - `‹` and `›` step through the list and wrap at either end; clicking the name opens the whole
   list, grouped by category under `FACTORY` and a heading per folder, with `Import presets…`,
-  `Export this preset…`, `Export category…`, `New category…` and `Reveal folder in Finder` below
-  it. The arrows ignore categories and walk the whole list, so a category never traps them.
+  `Move to…`, `Export this preset…`, `Export category…`, `New category…` and `Reveal folder in
+  Finder` below it. The arrows ignore categories and walk the whole list, so a category never
+  traps them.
+- `Move to…` lists the categories other than the one the preset is in and moves it there, keeping
+  its name and its pattern. The preset stays the one being shown, and a project saved afterwards
+  remembers it in its new category; moving the preset the session is on never drops the selection
+  to `FACTORY DEFAULT`.
 - `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and a
   category and writes a new file there. Both store the whole pattern — all eight lanes with all 64 steps, plus the
   pattern-wide transpose, scale and meter — and the lane the editor was showing.

@@ -104,6 +104,15 @@ public:
     juce::Result rename (const Entry& entry, const juce::String& newName,
                          juce::File* renamedFile = nullptr);
 
+    /**
+        Moves a preset to another category, keeping its name.
+
+        The document is written into the new category before the old file is removed, so a failed
+        write cannot lose the pattern. `movedFile` receives where the preset now lives.
+    */
+    juce::Result moveToCategory (const Entry& entry, const juce::String& category,
+                                 juce::File* movedFile = nullptr);
+
     /** Copies one preset document to `target`, which may be anywhere on disk. */
     juce::Result exportPreset (const Entry& entry, const juce::File& target) const;
 
