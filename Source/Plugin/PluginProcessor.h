@@ -79,6 +79,12 @@ public:
     juce::StringArray getCategories() const { return presetLibrary.categories(); }
 
     juce::Result createCategory (const juce::String& name);
+    juce::Result renameCategory (const juce::String& from, const juce::String& to);
+    juce::Result deleteCategory (const juce::String& category);
+    bool isCategoryEmpty (const juce::String& category) const
+    {
+        return presetLibrary.isCategoryEmpty (category);
+    }
 
     /** Moves preset `index` into `category`, keeping the current program on that preset. */
     juce::Result movePreset (int index, const juce::String& category);

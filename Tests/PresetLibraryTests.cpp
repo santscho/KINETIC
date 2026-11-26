@@ -26,6 +26,7 @@ public:
         testStoredFileNameFallsBackToFactory();
         testCategoryPresetSurvivesReopening();
         testMoveToCategory();
+        testCategoryRenameAndDelete();
         testFolderChangesArePickedUp();
         testExportAndImport();
         testImportPolicies();
@@ -516,6 +517,52 @@ private:
         // Moving a preset to the category it is already in changes nothing.
         expect (library.moveToCategory (library.entries()[movedIndex], "Bass", &moved).wasOk());
         expectEquals (library.entries().size(), 2);
+    }
+
+    void testCategoryRenameAndDelete()
+    {
+        beginTest ("Categories rename with their presets, and only empty ones can be deleted");
+
+        auto library = makeLibrary ("category-admin");
+        expect (library.createCategory ("Bass").wasOk());
+
+        juce::File line;
+        expect (library.save (makePattern(), 1, "Line", {}, &line, "Bass").wasOk());
+        const auto storedName = line.getFileName();
+
+        expect (library.renameCategory ("Bass", "Sub").wasOk());
+        expect (! library.categories().contains ("Bass"));
+        expect (library.categories().contains ("Sub"));
+        expectEquals (library.entries().size(), 2);
+
+        const auto index = library.indexForFileName (storedName, "Sub");
+        expect (index > 0, "the preset was not found in the renamed category");
+        expectEquals (library.entries()[index].name, juce::String ("Line"));
+        expectEquals (library.entries()[index].category, juce::String ("Sub"));
+        expect (library.entries()[index].file.getParentDirectory()
+                    == library.directory().getChildFile ("Sub"));
+
+        // A session saved before the rename still names the same preset: its category is stale,
+        // but the file name finds it.
+        const auto stale = library.indexForFileName (storedName, "Bass");
+        expect (stale > 0);
+        expect (library.entries()[stale].file == library.entries()[index].file);
+
+        // Renaming onto a folder that exists is refused instead of merging two categories.
+        expect (library.createCategory ("Pad").wasOk());
+        expect (library.renameCategory ("Sub", "Pad").failed());
+        expect (library.categories().contains ("Sub"));
+        expect (library.categories().contains ("Pad"));
+
+        // Only a category with no presets in it can be deleted.
+        expect (! library.isCategoryEmpty ("Sub"));
+        expect (library.deleteCategory ("Sub").failed());
+        expect (library.isCategoryEmpty ("Pad"));
+        expect (library.deleteCategory ("Pad").wasOk());
+        expect (! library.categories().contains ("Pad"));
+
+        // The default category is the library root and stays.
+        expect (library.deleteCategory (presets::Library::defaultCategoryName).failed());
     }
 
     void testRename()

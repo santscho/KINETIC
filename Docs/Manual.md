@@ -270,6 +270,13 @@ for the plug-in to find it again. `New category…` creates an empty folder, and
 category to write into. Presets of every category share one program list, ordered by category and
 then by name, so two categories may hold a preset of the same name.
 
+`Rename category…` renames a folder with every preset inside it: each preset keeps its name and
+its file name, so nothing that refers to it has to change — a project that was saved before the
+rename still opens on its preset, found by that file name. A name already in use is refused
+rather than merging two folders. `Delete empty category…` lists the categories that hold no
+preset and removes the folder after asking; a category with presets in it has to be emptied with
+`Move to…` or `DEL` first, and the default category cannot be deleted.
+
 Presets and the host session are independent: the session always stores the pattern itself, so a
 preset is a starting point and no session depends on a preset file still being there.
 
