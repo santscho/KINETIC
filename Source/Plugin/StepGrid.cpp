@@ -570,7 +570,10 @@ void StepGrid::showPitchMenu (int step, juce::Rectangle<float> anchor)
         if (((allowed >> pitchClass) & 1) != 0)
         {
             const auto candidate = octave * 12 + pitchClass;
-            menu.addItem (pitchClass + 1, noteName (candidate), candidate == note);
+
+            // JUCE 8 takes isEnabled before isTicked: every note stays selectable, the
+            // current one just carries the tick.
+            menu.addItem (pitchClass + 1, noteName (candidate), true, candidate == note);
         }
 
     // With the buttons hidden by a narrow grid the menu carries the octave moves instead.
