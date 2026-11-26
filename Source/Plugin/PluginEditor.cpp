@@ -31,29 +31,45 @@ KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor&
     startTimerHz (20);
 }
 
+KineticAudioProcessorEditor::HeaderLayout KineticAudioProcessorEditor::headerLayout() const
+{
+    auto header = getLocalBounds().reduced (16, 14).removeFromTop (28);
+
+    HeaderLayout layout;
+
+    layout.accentBar = header.removeFromLeft (3);
+    header.removeFromLeft (10);
+
+    // Reserve the badge first, then put the preset browser to its left. At the 860 pixel
+    // minimum the browser still gets its full width and the title keeps 249 pixels.
+    layout.badge = header.removeFromRight (132);
+    header.removeFromRight (14);
+
+    layout.preset = header.removeFromRight (juce::jmin (420, header.getWidth())).reduced (0, 2);
+    layout.title = header;
+
+    return layout;
+}
+
 void KineticAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (theme::background);
 
-    auto area = getLocalBounds().reduced (16, 14);
-    auto header = area.removeFromTop (28);
+    const auto layout = headerLayout();
 
     g.setColour (theme::accent);
-    g.fillRoundedRectangle (header.removeFromLeft (3).toFloat(), 1.5f);
-    header.removeFromLeft (10);
-
-    auto badge = header.removeFromRight (132);
+    g.fillRoundedRectangle (layout.accentBar.toFloat(), 1.5f);
 
     g.setColour (theme::text);
     g.setFont (theme::heading (19.0f));
-    g.drawText ("KINETIC", header, juce::Justification::centredLeft, false);
+    g.drawText ("KINETIC", layout.title, juce::Justification::centredLeft, false);
 
     g.setColour (theme::panel);
-    g.fillRoundedRectangle (badge.toFloat().reduced (0.0f, 2.0f), 5.0f);
+    g.fillRoundedRectangle (layout.badge.toFloat().reduced (0.0f, 2.0f), 5.0f);
 
     g.setColour (theme::accent);
     g.setFont (theme::mono (10.0f));
-    g.drawText (kinetic::formatName, badge, juce::Justification::centred, false);
+    g.drawText (kinetic::formatName, layout.badge, juce::Justification::centred, false);
 
     if (! footerArea.isEmpty())
     {
@@ -67,12 +83,11 @@ void KineticAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds().reduced (16, 14);
 
-    // The preset browser shares the header row with the title and the format badge.
-    auto header = area.removeFromTop (28);
-    auto presetArea = header.removeFromRight (juce::jmin (420, juce::jmax (280, header.getWidth() - 200)));
-    presetBar.setBounds (presetArea.withSizeKeepingCentre (presetArea.getWidth(), 24));
+    // The header row is already split into title, preset browser and badge by headerLayout(),
+    // so the browser can never be laid out under the badge paint() draws.
+    presetBar.setBounds (headerLayout().preset);
 
-    area.removeFromTop (10);
+    area.removeFromTop (38);
 
     footerArea = area.removeFromBottom (26);
     panicButton.setBounds (footerArea.removeFromRight (74));

@@ -28,6 +28,17 @@ private:
 
     juce::String transportLine() const;
 
+    /**
+        The header row, split once so paint() and resized() cannot disagree about it: the badge
+        owns the right end, the preset browser ends to its left and the title takes the rest.
+    */
+    struct HeaderLayout
+    {
+        juce::Rectangle<int> accentBar, title, preset, badge;
+    };
+
+    HeaderLayout headerLayout() const;
+
     KineticAudioProcessor& audioProcessor;
     PatternEditor patternEditor;
     PresetBar presetBar;
