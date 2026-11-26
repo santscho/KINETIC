@@ -79,7 +79,7 @@ namespace
         auto& lane = pattern.lanes[static_cast<std::size_t> (index)];
         lane.settings.enabled = true;
         lane.settings.midiChannel = channel;
-        lane.settings.rootNote = rootNote;
+        pattern.rootNote = rootNote;
         lane.settings.clock = clock;
         lane.settings.gateLength = length;
         lane.settings.pitchLength = length;
@@ -718,7 +718,7 @@ public:
         {
             Rig rig;
             setupLane (rig.pattern(), 0, 1, { 1, 4, ClockModifier::straight }, 1, 60);
-            setupLane (rig.pattern(), 1, 1, { 1, 4, ClockModifier::straight }, 2, 72);
+            setupLane (rig.pattern(), 1, 1, { 1, 4, ClockModifier::straight }, 2, 60);
 
             const auto events = rig.block (24000);
 
@@ -732,12 +732,40 @@ public:
                     channel1 = true;
 
                 if (event.message.isNoteOn() && event.message.getChannel() == 2
-                    && event.message.getNoteNumber() == 72)
+                    && event.message.getNoteNumber() == 60)
                     channel2 = true;
             }
 
             expect (channel1);
             expect (channel2);
+        }
+
+        beginTest ("The root note transposes every lane at once");
+        {
+            Rig rig;
+
+            // One root note for the pattern: every lane's painted pitch is an offset from it.
+            for (int i = 0; i < maxLanes; ++i)
+                setupLane (rig.pattern(), i, 1, { 1, 4, ClockModifier::straight }, i + 1, 72);
+
+            const auto events = rig.block (24000);
+
+            int transposed = 0;
+            int others = 0;
+
+            for (const auto& event : events)
+            {
+                if (! event.message.isNoteOn())
+                    continue;
+
+                if (event.message.getNoteNumber() == 72)
+                    ++transposed;
+                else
+                    ++others;
+            }
+
+            expectEquals (transposed, maxLanes);
+            expectEquals (others, 0);
         }
 
         beginTest ("Eight lanes run polymetrically without interfering");

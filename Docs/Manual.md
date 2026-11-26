@@ -133,7 +133,7 @@ say the same as the table below.
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
-| Root note (`−` `+`, `OCT`) | 0–127, default 60 | The lane's root note. `+` and `−` transpose it one octave up or down, and the `OCT` readout shows the octave of the current note (`C3` reads `OCT 3`). |
+| Root note (`−` `+`, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. `+` and `−` transpose it one octave up or down, and the `OCT` readout shows the octave of the current note (`C3` reads `OCT 3`). |
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
 | Key | `C` … `B` | Key of the scale. |
 | Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
@@ -242,8 +242,10 @@ through the state format — but the editor has no controls for them in 0.5.0.
 
 ### 6.2 MIDI channel and root note
 
-Per lane, 1–16 (default 1) and 0–127 (default 60, i.e. C3 in Live/JUCE naming). The root note is
-transposed by the editor's `−`/`+` octave buttons (§4.3); the channel is still state-format only.
+The MIDI channel is per lane, 1–16 (default 1), and still state-format only. The root note is one
+note for the whole pattern, 0–127 (default 60, i.e. C3 in Live/JUCE naming): it is transposed by
+the editor's `−`/`+` octave buttons (§4.3), and the painted pitch of every lane is an offset from
+it, so one transpose moves all eight lanes together.
 
 ### 6.3 Scales
 
@@ -253,11 +255,11 @@ painted pitch is played exactly. A note that is already sounding is never retune
 key, the mode or the switch cannot make a held note jump — the change takes effect with the next
 trigger.
 
-The modes are `chromatic`, `major`, `minor`, `dorian`, `phrygianDominant`, `pentatonic` and
-`custom` with a 12-bit mask (C = bit 0, default `0x0fff`). The key is one of the twelve pitch
-classes. A lane uses the global key and mode unless `useGlobalScale` is cleared, in which case it
-uses its own `scale` and `scaleRoot`; the switch gates both. Quantisation picks the nearest allowed
-pitch class and resolves ties upward, so `F#` in C major becomes `G`.
+The modes are `chromatic`, `major`, `minor`, `dorian`, `phrygianDominant` and `pentatonic`; the
+state format also carries `custom` with a 12-bit mask (C = bit 0, default `0x0fff`) that no editor
+control sets yet. The key is one of the twelve pitch classes. Key, mode and switch are pattern-wide
+and apply to all eight lanes. Quantisation picks the nearest allowed pitch class and resolves ties
+upward, so `F#` in C major becomes `G`.
 
 ### 6.4 Sub-lane loop lengths
 
