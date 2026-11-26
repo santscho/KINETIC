@@ -466,7 +466,9 @@ void PresetBar::confirmDeleteCategory (const juce::String& category)
 {
     auto* alert = new juce::AlertWindow ("Delete category",
                                          "Delete the empty category \"" + category
-                                             + "\"? The folder is removed from disk.",
+                                             + "\"? Its folder is removed from disk, which is only "
+                                               "allowed while the folder holds nothing but "
+                                               "presets - a note or a folder in there keeps it.",
                                          juce::MessageBoxIconType::WarningIcon);
     alert->addButton ("Delete", 1, juce::KeyPress (juce::KeyPress::returnKey));
     alert->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));

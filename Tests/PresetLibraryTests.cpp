@@ -563,6 +563,34 @@ private:
 
         // The default category is the library root and stays.
         expect (library.deleteCategory (presets::Library::defaultCategoryName).failed());
+
+        // A folder holding anything that is not a preset is refused, and the message names it,
+        // because deleting the category would take that file with it.
+        expect (library.createCategory ("Sketches").wasOk());
+        const auto sketches = library.directory().getChildFile ("Sketches");
+        const auto note = sketches.getChildFile ("notes.txt");
+        expect (note.replaceWithText ("not a preset"));
+        expect (library.isCategoryEmpty ("Sketches"));
+
+        const auto refused = library.deleteCategory ("Sketches");
+        expect (refused.failed());
+        expect (refused.getErrorMessage().contains ("notes.txt"));
+        expect (note.existsAsFile());
+        expect (library.categories().contains ("Sketches"));
+
+        // Renaming keeps it where it is, and a subfolder is in the way just the same.
+        expect (library.renameCategory ("Sketches", "Ideas").wasOk());
+        expect (note.existsAsFile());
+        expect (sketches.getChildFile ("older").createDirectory().wasOk());
+        expect (library.deleteCategory ("Sketches").failed());
+        expect (sketches.getChildFile ("older").isDirectory());
+
+        // With only presets left in it - or nothing at all - the category goes.
+        expect (library.deleteCategory ("Ideas").wasOk());
+        expect (note.deleteFile());
+        expect (sketches.getChildFile ("older").deleteRecursively());
+        expect (library.deleteCategory ("Sketches").wasOk());
+        expect (! sketches.isDirectory());
     }
 
     void testRename()
