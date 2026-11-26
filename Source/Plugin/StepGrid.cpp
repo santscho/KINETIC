@@ -350,6 +350,7 @@ void StepGrid::paint (juce::Graphics& g)
     const auto loopLength = juce::jlimit (1, maxSteps, lane.settings.gateLength);
     const auto columnWidth = cellWidth();
     const auto area = cellArea();
+    const auto beatGroup = juce::jmax (1, pattern.beatsPerBar);
 
     g.setColour (theme::panel);
     g.fillRoundedRectangle (getLocalBounds().toFloat(), 6.0f);
@@ -403,8 +404,9 @@ void StepGrid::paint (juce::Graphics& g)
             const auto inLoop = step < loopLength;
             const auto dim = inLoop ? 1.0f : 0.33f;
 
-            // Every fourth step is a beat: those cells sit on a slightly lighter plate.
-            g.setColour (theme::raised.withAlpha ((step / 4) % 2 == 0 ? dim : dim * 0.6f));
+            // Columns alternate in groups of the pattern's beats per bar, so bars are easy to
+            // follow in any meter; the first group of each bar sits on the lighter plate.
+            g.setColour (theme::raised.withAlpha ((step / beatGroup) % 2 == 0 ? dim : dim * 0.6f));
             g.fillRoundedRectangle (cell, 2.5f);
 
             switch (row)

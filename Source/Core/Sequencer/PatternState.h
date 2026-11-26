@@ -29,6 +29,7 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
     element->setAttribute ("globalRoot", pattern.globalRoot);
     element->setAttribute ("customMask", static_cast<int> (pattern.customScaleMask));
     element->setAttribute ("scaleEnabled", pattern.scaleEnabled ? 1 : 0);
+    element->setAttribute ("beatsPerBar", pattern.beatsPerBar);
 
     const Step defaults;
 
@@ -149,6 +150,10 @@ inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& 
     pattern.customScaleMask = static_cast<juce::uint16> (
         element->getIntAttribute ("customMask", static_cast<int> (pattern.customScaleMask)));
     pattern.scaleEnabled = element->getIntAttribute ("scaleEnabled", 0) != 0;
+
+    // Absent in sessions written before the meter existed; those were shaded in fours.
+    pattern.beatsPerBar = juce::jlimit (1, 16,
+                                        element->getIntAttribute ("beatsPerBar", pattern.beatsPerBar));
 
     for (const auto* laneElement : element->getChildIterator())
     {

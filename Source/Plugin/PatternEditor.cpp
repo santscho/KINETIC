@@ -157,6 +157,21 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
     };
     addAndMakeVisible (scaleBox);
 
+    // Beats per bar: the time signature the grid shades its columns by. It reaches no engine
+    // code - a step is timed by its division, which is a note value - so this is the meter as
+    // far as the editor is concerned.
+    for (int beats = 1; beats <= 16; ++beats)
+        meterBox.addItem (juce::String (beats) + (beats == 1 ? " BEAT" : " BEATS"), beats);
+
+    meterBox.setTooltip ("Time signature: beats per bar. The grid alternates its column shading "
+                         "every this many steps, so a 3/4 pattern lights up in threes");
+    meterBox.onChange = [this]
+    {
+        shared.edit().beatsPerBar = juce::jlimit (1, 16, meterBox.getSelectedId());
+        commit();
+    };
+    addAndMakeVisible (meterBox);
+
     // A pattern with no enabled lane is silent, so open on something that can play.
     bool anyEnabled = false;
 
@@ -232,6 +247,7 @@ void PatternEditor::refreshControls()
             scaleId = i + 1;
 
     scaleBox.setSelectedId (scaleId, juce::dontSendNotification);
+    meterBox.setSelectedId (juce::jlimit (1, 16, pattern.beatsPerBar), juce::dontSendNotification);
 }
 
 void PatternEditor::commit()
@@ -255,6 +271,7 @@ void PatternEditor::resized()
     keyBox.setBounds (globalRow.removeFromLeft (66));
     globalRow.removeFromLeft (6);
     scaleBox.setBounds (globalRow.removeFromLeft (152));
+    meterBox.setBounds (globalRow.removeFromRight (96));
 
     area.removeFromTop (10);
 

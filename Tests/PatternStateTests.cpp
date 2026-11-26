@@ -61,7 +61,8 @@ private:
     static bool patternsMatch (const Pattern& a, const Pattern& b)
     {
         if (a.rootNote != b.rootNote || a.globalScale != b.globalScale || a.globalRoot != b.globalRoot
-             || a.customScaleMask != b.customScaleMask || a.scaleEnabled != b.scaleEnabled)
+             || a.customScaleMask != b.customScaleMask || a.scaleEnabled != b.scaleEnabled
+             || a.beatsPerBar != b.beatsPerBar)
             return false;
 
         for (std::size_t i = 0; i < a.lanes.size(); ++i)
@@ -80,6 +81,7 @@ private:
         pattern.globalScale = ScaleType::dorian;
         pattern.globalRoot = 3;
         pattern.customScaleMask = 0x0295;
+        pattern.beatsPerBar = 3;
 
         for (int laneIndex = 0; laneIndex < maxLanes; ++laneIndex)
         {

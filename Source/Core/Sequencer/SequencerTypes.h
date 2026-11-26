@@ -126,6 +126,11 @@ struct Pattern
     // Scale aware: every generated note is snapped to the key and scale below. Off by default,
     // so an untouched pattern plays the painted pitches exactly.
     bool scaleEnabled = false;
+
+    // Time signature numerator: the grid shades its columns in alternating groups of this many,
+    // so 4/4 lights up in fours and 3/4 in threes. It changes no step timing - a step's length
+    // comes from the lane's division, which is a note value and knows nothing about the meter.
+    int beatsPerBar = 4;
     ScaleType globalScale = ScaleType::chromatic;
     int globalRoot = 0;
     juce::uint16 customScaleMask = 0x0fff;
