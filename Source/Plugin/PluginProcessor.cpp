@@ -142,13 +142,17 @@ void KineticAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // Read the message-thread copy, which is the one the editor writes.
     kinetic::patternstate::writeToXml (sharedPattern.edit(), selectedLane.load(), state);
 
-    // Which preset the session was using, stored by file name: entry numbers move when the
-    // folder changes, a file name stays attached to its preset.
+    // Which preset the session was using, stored by file name and category: entry numbers move
+    // when the folder changes, while the name stays attached to its preset - and the category is
+    // what makes it findable again inside its folder, and tells presets of the same name apart.
     const auto& entries = presetLibrary.entries();
     const auto program = currentProgram.load (std::memory_order_relaxed);
 
     if (juce::isPositiveAndBelow (program, entries.size()) && ! entries[program].isFactory)
+    {
         state.setAttribute ("preset", entries[program].file.getFileName());
+        state.setAttribute ("presetCategory", entries[program].category);
+    }
 
     copyXmlToBinary (state, destData);
 }
@@ -175,12 +179,12 @@ void KineticAudioProcessor::setStateInformation (const void* data, int sizeInByt
         }
 
         // The header and the host both name the preset the project was saved with. It is looked
-        // up by file name, so a folder that changed in the meantime falls back to the factory
-        // entry rather than naming whichever preset now sits at that number. The pattern itself
-        // has already been restored either way.
+        // up by file name inside the category it was saved from, so a folder that changed in the
+        // meantime falls back to the factory entry rather than naming whichever preset now sits
+        // at that number. The pattern itself has already been restored either way.
         presetLibrary.reload();
-        currentProgram.store (presets::indexForFileName (presetLibrary,
-                                                         xml->getStringAttribute ("preset")),
+        currentProgram.store (presetLibrary.indexForFileName (xml->getStringAttribute ("preset"),
+                                                              xml->getStringAttribute ("presetCategory")),
                               std::memory_order_relaxed);
         updateProgramNames();
 
