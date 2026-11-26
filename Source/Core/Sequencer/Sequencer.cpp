@@ -327,16 +327,15 @@ void Sequencer::emitStep (const Lane& lane, LaneRuntime& rt, double startPpq,
     }
 
     // Scale aware is the master switch: switched off, every note lands exactly on the painted
-    // pitch whatever the lane or global scale says, so the quantiser is a no-op.
+    // pitch whatever the pattern scale says, so the quantiser is a no-op. Key, scale and root
+    // note are pattern-wide, so all eight lanes move together.
     const auto mask = pattern.scaleEnabled
-                          ? math::scaleMask (settings.useGlobalScale ? pattern.globalScale
-                                                                     : settings.scale,
-                                             pattern.customScaleMask)
+                          ? math::scaleMask (pattern.globalScale, pattern.customScaleMask)
                           : static_cast<juce::uint16> (0x0fff);
-    const auto root = settings.useGlobalScale ? pattern.globalRoot : settings.scaleRoot;
+    const auto root = pattern.globalRoot;
 
     const auto note = juce::jlimit (0, 127,
-                                    math::quantise (settings.rootNote + static_cast<int> (pitchStep.pitch),
+                                    math::quantise (pattern.rootNote + static_cast<int> (pitchStep.pitch),
                                                     mask, root));
 
     auto velocity = static_cast<float> (juce::jlimit (0, 127, static_cast<int> (velocityStep.velocity)))

@@ -70,7 +70,7 @@ struct Step
     bool accent = false;
 
     // Pitch / velocity / mod sub-lanes
-    juce::int8  pitch = 0;             // semitone offset from the lane root
+    juce::int8  pitch = 0;             // semitone offset from the pattern root
     juce::uint8 mod = 64;              // CC value when the lane is a CC lane
 };
 
@@ -79,7 +79,6 @@ struct LaneSettings
     bool enabled = false;
     LaneType type = LaneType::note;
     int midiChannel = 1;               // 1-16
-    int rootNote = 60;
 
     ClockRatio clock { 1, 16, ClockModifier::straight };
 
@@ -98,11 +97,6 @@ struct LaneSettings
     int euclidSteps = 16;
     int euclidPulses = 4;
     int euclidRotation = 0;
-
-    // Scale quantiser
-    bool useGlobalScale = true;
-    ScaleType scale = ScaleType::chromatic;
-    int scaleRoot = 0;
 
     // Acid translation
     SlideMode slideMode = SlideMode::legatoOverlap;
@@ -124,6 +118,10 @@ struct Lane
 struct Pattern
 {
     std::array<Lane, maxLanes> lanes {};
+
+    // Root note of the whole pattern: every lane's painted pitch is an offset from this note, so
+    // transposing it moves all eight lanes together.
+    int rootNote = 60;
 
     // Scale aware: every generated note is snapped to the key and scale below. Off by default,
     // so an untouched pattern plays the painted pitches exactly.

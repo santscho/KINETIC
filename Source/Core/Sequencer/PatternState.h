@@ -24,6 +24,7 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
 
     element->setAttribute ("format", formatVersion);
     element->setAttribute ("selectedLane", juce::jlimit (0, maxLanes - 1, selectedLane));
+    element->setAttribute ("rootNote", pattern.rootNote);
     element->setAttribute ("globalScale", static_cast<int> (pattern.globalScale));
     element->setAttribute ("globalRoot", pattern.globalRoot);
     element->setAttribute ("customMask", static_cast<int> (pattern.customScaleMask));
@@ -42,7 +43,6 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
         laneElement->setAttribute ("enabled", settings.enabled ? 1 : 0);
         laneElement->setAttribute ("type", static_cast<int> (settings.type));
         laneElement->setAttribute ("channel", settings.midiChannel);
-        laneElement->setAttribute ("rootNote", settings.rootNote);
         laneElement->setAttribute ("clockNum", settings.clock.numerator);
         laneElement->setAttribute ("clockDen", settings.clock.denominator);
         laneElement->setAttribute ("clockMod", static_cast<int> (settings.clock.modifier));
@@ -56,9 +56,6 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
         laneElement->setAttribute ("euclidSteps", settings.euclidSteps);
         laneElement->setAttribute ("euclidPulses", settings.euclidPulses);
         laneElement->setAttribute ("euclidRotation", settings.euclidRotation);
-        laneElement->setAttribute ("useGlobalScale", settings.useGlobalScale ? 1 : 0);
-        laneElement->setAttribute ("scale", static_cast<int> (settings.scale));
-        laneElement->setAttribute ("scaleRoot", settings.scaleRoot);
         laneElement->setAttribute ("slideMode", static_cast<int> (settings.slideMode));
         laneElement->setAttribute ("bendRange", settings.bendRangeSemitones);
         laneElement->setAttribute ("overlapMs", settings.slideOverlapMs);
@@ -139,6 +136,13 @@ inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& 
     selectedLane = juce::jlimit (0, maxLanes - 1,
                                  element->getIntAttribute ("selectedLane", selectedLane));
 
+    // The root note used to be stored per lane; an older session keeps the first lane's value so
+    // loading one does not transpose the pattern behind the player's back.
+    const auto* firstLaneElement = element->getChildByName ("lane");
+
+    pattern.rootNote = element->getIntAttribute (
+        "rootNote", firstLaneElement != nullptr ? firstLaneElement->getIntAttribute ("rootNote", 60) : 60);
+
     pattern.globalScale = static_cast<ScaleType> (
         element->getIntAttribute ("globalScale", static_cast<int> (pattern.globalScale)));
     pattern.globalRoot = element->getIntAttribute ("globalRoot", pattern.globalRoot);
@@ -162,7 +166,6 @@ inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& 
         settings.enabled = laneElement->getIntAttribute ("enabled", 0) != 0;
         settings.type = static_cast<LaneType> (laneElement->getIntAttribute ("type", 0));
         settings.midiChannel = laneElement->getIntAttribute ("channel", 1);
-        settings.rootNote = laneElement->getIntAttribute ("rootNote", 60);
         settings.clock.numerator = laneElement->getIntAttribute ("clockNum", 1);
         settings.clock.denominator = laneElement->getIntAttribute ("clockDen", 16);
         settings.clock.modifier = static_cast<ClockModifier> (laneElement->getIntAttribute ("clockMod", 0));
@@ -176,9 +179,6 @@ inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& 
         settings.euclidSteps = laneElement->getIntAttribute ("euclidSteps", 16);
         settings.euclidPulses = laneElement->getIntAttribute ("euclidPulses", 4);
         settings.euclidRotation = laneElement->getIntAttribute ("euclidRotation", 0);
-        settings.useGlobalScale = laneElement->getIntAttribute ("useGlobalScale", 1) != 0;
-        settings.scale = static_cast<ScaleType> (laneElement->getIntAttribute ("scale", 0));
-        settings.scaleRoot = laneElement->getIntAttribute ("scaleRoot", 0);
         settings.slideMode = static_cast<SlideMode> (laneElement->getIntAttribute ("slideMode", 0));
         settings.bendRangeSemitones = laneElement->getDoubleAttribute ("bendRange", 2.0);
         settings.slideOverlapMs = laneElement->getDoubleAttribute ("overlapMs", 12.0);

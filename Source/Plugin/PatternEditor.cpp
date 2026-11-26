@@ -117,7 +117,7 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
 
     rootNoteSelector.onNoteChange = [this] (int note)
     {
-        currentLane().settings.rootNote = note;
+        shared.edit().rootNote = note;
         commit();
     };
     addAndMakeVisible (rootNoteSelector);
@@ -217,10 +217,10 @@ void PatternEditor::refreshControls()
 
     modifierBox.setSelectedId (modifierId, juce::dontSendNotification);
     directionBox.setSelectedId (static_cast<int> (settings.direction) + 1, juce::dontSendNotification);
-    rootNoteSelector.setNote (settings.rootNote);
 
     const auto& pattern = shared.edit();
 
+    rootNoteSelector.setNote (pattern.rootNote);
     scaleButton.setToggleState (pattern.scaleEnabled, juce::dontSendNotification);
     scaleButton.setButtonText (pattern.scaleEnabled ? "SCALE ON" : "SCALE OFF");
 

@@ -29,15 +29,14 @@ private:
         const auto& y = b.settings;
 
         if (x.enabled != y.enabled || x.type != y.type || x.midiChannel != y.midiChannel
-             || x.rootNote != y.rootNote || x.modController != y.modController
+             || x.modController != y.modController
              || x.clock.numerator != y.clock.numerator || x.clock.denominator != y.clock.denominator
              || x.clock.modifier != y.clock.modifier || x.gateLength != y.gateLength
              || x.pitchLength != y.pitchLength || x.velocityLength != y.velocityLength
              || x.modLength != y.modLength || x.direction != y.direction
              || x.euclidEnabled != y.euclidEnabled || x.euclidSteps != y.euclidSteps
              || x.euclidPulses != y.euclidPulses || x.euclidRotation != y.euclidRotation
-             || x.useGlobalScale != y.useGlobalScale || x.scale != y.scale
-             || x.scaleRoot != y.scaleRoot || x.slideMode != y.slideMode
+             || x.slideMode != y.slideMode
              || ! juce::approximatelyEqual (x.bendRangeSemitones, y.bendRangeSemitones)
              || ! juce::approximatelyEqual (x.slideOverlapMs, y.slideOverlapMs) || x.accentCC != y.accentCC
              || x.accentCCValue != y.accentCCValue || x.accentVelocityBoost != y.accentVelocityBoost)
@@ -61,7 +60,7 @@ private:
 
     static bool patternsMatch (const Pattern& a, const Pattern& b)
     {
-        if (a.globalScale != b.globalScale || a.globalRoot != b.globalRoot
+        if (a.rootNote != b.rootNote || a.globalScale != b.globalScale || a.globalRoot != b.globalRoot
              || a.customScaleMask != b.customScaleMask || a.scaleEnabled != b.scaleEnabled)
             return false;
 
@@ -76,6 +75,7 @@ private:
     static Pattern makeBusyPattern()
     {
         Pattern pattern;
+        pattern.rootNote = 67;
         pattern.scaleEnabled = true;
         pattern.globalScale = ScaleType::dorian;
         pattern.globalRoot = 3;
@@ -89,7 +89,6 @@ private:
             settings.enabled = laneIndex % 2 == 0;
             settings.type = laneIndex == 3 ? LaneType::cc : LaneType::note;
             settings.midiChannel = 1 + laneIndex;
-            settings.rootNote = 48 + laneIndex;
             settings.clock = { 1, 4, laneIndex % 3 == 0 ? ClockModifier::dotted
                                  : laneIndex % 3 == 1 ? ClockModifier::triplet
                                                       : ClockModifier::straight };
@@ -103,9 +102,6 @@ private:
             settings.euclidSteps = 5 + laneIndex;
             settings.euclidPulses = laneIndex;
             settings.euclidRotation = laneIndex % 3;
-            settings.useGlobalScale = laneIndex % 2 == 0;
-            settings.scale = static_cast<ScaleType> (laneIndex % 7);
-            settings.scaleRoot = laneIndex % 12;
             settings.slideMode = static_cast<SlideMode> (laneIndex % 3);
             settings.bendRangeSemitones = 1.0 + laneIndex;
             settings.slideOverlapMs = 5.0 + laneIndex;
