@@ -218,10 +218,11 @@ channel it has used.
 The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE AS` `DEL`.
 
 - `‹` and `›` step through the list and wrap at either end; clicking the name opens the whole
-  list, with `Import presets…`, `Export this preset…`, `Export folder…` and `Reveal folder in
-  Finder` below it.
-- `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and writes a
-  new file. Both store the whole pattern — all eight lanes with all 64 steps, plus the
+  list, grouped by category under `FACTORY` and a heading per folder, with `Import presets…`,
+  `Export this preset…`, `Export category…`, `New category…` and `Reveal folder in Finder` below
+  it. The arrows ignore categories and walk the whole list, so a category never traps them.
+- `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and a
+  category and writes a new file there. Both store the whole pattern — all eight lanes with all 64 steps, plus the
   pattern-wide transpose, scale and meter — and the lane the editor was showing.
 - `DEL` asks first, then deletes the preset's file. The pattern in the editor is left as it is.
 - A `*` after the name means the pattern changed since it was loaded or saved. `SAVE` and
@@ -256,15 +257,25 @@ session, wrapped in a `KINETIC_PRESET` element that carries the format, its vers
 so a preset can be read, edited, backed up or copied between machines by hand. Files that are not
 KINETIC presets are ignored rather than listed.
 
+**Categories** are the folders inside that directory, one folder per category, so a library can be
+organised without a second kind of document: moving a file between folders in the Finder moves it
+between categories. The default category is `User`, and it is the directory itself — a folder
+written before categories existed keeps its presets where they are, and no file has to be moved
+for the plug-in to find it again. `New category…` creates an empty folder, and `SAVE AS` offers a
+category to write into. Presets of every category share one program list, ordered by category and
+then by name, so two categories may hold a preset of the same name.
+
 Presets and the host session are independent: the session always stores the pattern itself, so a
 preset is a starting point and no session depends on a preset file still being there.
 
 **Moving presets between machines.** `Export this preset…` writes the selected preset to a
-`.kineticpreset` file wherever you choose, and `Export folder…` writes the whole folder to one
-`.kineticset` archive. `Import presets…` takes either — several at once — and copies the presets
-into the folder.
+`.kineticpreset` file wherever you choose, and `Export category…` writes one category to a single
+`.kineticset` archive, so a library can be moved folder by folder. `Import presets…` takes either
+— several at once — and copies the presets in: a single preset into the category you are showing,
+an archive into the category it is named after, created when this machine does not have it yet.
 
-A preset whose name is already in the folder follows the policy picked in the import submenu:
+A preset whose name is already in the target category follows the policy picked in the import
+submenu:
 
 | Policy | What happens to the existing preset |
 | --- | --- |
@@ -272,8 +283,11 @@ A preset whose name is already in the folder follows the policy picked in the im
 | `Replace Existing Presets` | The imported pattern replaces the existing one, which keeps its name and its file. Use this to refresh a preset that came from another machine. |
 | `Skip Existing Presets` | The name already there is left untouched and the imported one is dropped. |
 
-The dialog reports how many were imported, skipped and refused. An archive is the same per-preset documents collected
-under one `KINETIC_PRESETS` element, so a single preset can also be lifted out of one by hand.
+The policy applies within the target category, so importing into a folder that already has that
+name is the same decision as importing into `User`. The dialog reports how many were imported,
+skipped and refused. An archive is the same per-preset documents collected under one
+`KINETIC_PRESETS` element whose `name` is the category, so a single preset can also be lifted out
+of one by hand.
 
 ---
 

@@ -27,6 +27,7 @@ public:
         testFolderChangesArePickedUp();
         testExportAndImport();
         testImportPolicies();
+        testCategories();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -253,9 +254,9 @@ private:
         expect (source.exportPreset (source.entries()[1], single).wasOk());
         expect (single.existsAsFile());
 
-        // The whole folder.
+        // The whole default category.
         const auto archive = temp.getChildFile ("Set.kineticset");
-        expect (source.exportArchive (archive).wasOk());
+        expect (source.exportArchive (archive, presets::Library::defaultCategoryName).wasOk());
         expect (archive.existsAsFile());
 
         auto destination = makeLibrary ("export-destination");
@@ -372,6 +373,64 @@ private:
             expect (library.load (library.entries()[1], loaded, lane));
             expectEquals (loaded.rootNote, 40);
         }
+    }
+
+    void testCategories()
+    {
+        beginTest ("Categories are folders, and each one archives on its own");
+
+        auto library = makeLibrary ("categories");
+
+        expect (library.createCategory ("Bass").wasOk());
+        expect (library.categories().contains ("Bass"));
+        expect (library.categories().contains (presets::Library::defaultCategoryName));
+
+        juce::File home, deep;
+        expect (library.save (makePattern(), 0, "Home", {}, &home).wasOk());
+        expect (library.save (makePattern(), 0, "Deep", {}, &deep, "Bass").wasOk());
+
+        // The default category is the library root, so a folder written before categories
+        // existed keeps its presets where they are; other categories are folders of their own.
+        expect (home.getParentDirectory() == library.directory());
+        expect (deep.getParentDirectory() == library.directory().getChildFile ("Bass"));
+
+        for (const auto& entry : library.entries())
+        {
+            if (entry.name == "Home")
+                expectEquals (entry.category, juce::String (presets::Library::defaultCategoryName));
+            else if (entry.name == "Deep")
+                expectEquals (entry.category, juce::String ("Bass"));
+        }
+
+        // One archive holds one category.
+        const auto archive = temp.getChildFile ("Bass.kineticset");
+        expect (library.exportArchive (archive, "Bass").wasOk());
+
+        auto destination = makeLibrary ("categories-destination");
+
+        juce::Array<juce::File> files;
+        files.add (archive);
+
+        const auto summary = destination.importFrom (files);
+        expectEquals (summary.imported, 1);
+        expect (summary.failures.isEmpty());
+        expectEquals (destination.entries().size(), 2);
+        expectEquals (destination.entries()[1].name, juce::String ("Deep"));
+
+        // The archive restores its own folder, which did not exist on this machine.
+        expectEquals (destination.entries()[1].category, juce::String ("Bass"));
+        expect (destination.categories().contains ("Bass"));
+        expect (destination.entries()[1].file.getParentDirectory()
+                    == destination.directory().getChildFile ("Bass"));
+
+        Pattern loaded;
+        int lane = 0;
+        expect (destination.load (destination.entries()[1], loaded, lane));
+        expectEquals (loaded.rootNote, 67);
+
+        // A category with nothing in it has nothing to archive.
+        expect (library.createCategory ("Empty").wasOk());
+        expect (library.exportArchive (temp.getChildFile ("Empty.kineticset"), "Empty").failed());
     }
 
     void testRename()

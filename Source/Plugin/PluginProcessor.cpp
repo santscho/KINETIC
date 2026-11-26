@@ -320,8 +320,18 @@ bool KineticAudioProcessor::applyPreset (int index)
     return true;
 }
 
+juce::Result KineticAudioProcessor::createCategory (const juce::String& name)
+{
+    if (const auto result = presetLibrary.createCategory (name); result.failed())
+        return result;
+
+    updateProgramNames();
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    return juce::Result::ok();
+}
+
 juce::Result KineticAudioProcessor::savePreset (const juce::String& name, int replacing,
-                                                int* savedProgram)
+                                                const juce::String& category, int* savedProgram)
 {
     const auto entries = presetLibrary.entries();
     presets::Entry target;
@@ -338,7 +348,7 @@ juce::Result KineticAudioProcessor::savePreset (const juce::String& name, int re
     juce::File saved;
 
     if (const auto result = presetLibrary.save (sharedPattern.edit(), selectedLane.load(),
-                                                presetName, replacingFile, &saved);
+                                                presetName, replacingFile, &saved, category);
         result.failed())
         return result;
 
@@ -380,9 +390,10 @@ juce::Result KineticAudioProcessor::deletePreset (int index)
 }
 
 presets::Library::ImportSummary KineticAudioProcessor::importPresets (
-    const juce::Array<juce::File>& sources, presets::Library::ImportPolicy policy)
+    const juce::Array<juce::File>& sources, presets::Library::ImportPolicy policy,
+    const juce::String& fallbackCategory)
 {
-    const auto summary = presetLibrary.importFrom (sources, policy);
+    const auto summary = presetLibrary.importFrom (sources, policy, fallbackCategory);
 
     updateProgramNames();
     updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
@@ -399,9 +410,10 @@ juce::Result KineticAudioProcessor::exportPreset (int index, const juce::File& t
     return presetLibrary.exportPreset (entries[index], target);
 }
 
-juce::Result KineticAudioProcessor::exportFolder (const juce::File& target) const
+juce::Result KineticAudioProcessor::exportCategory (const juce::String& category,
+                                                   const juce::File& target) const
 {
-    return presetLibrary.exportArchive (target);
+    return presetLibrary.exportArchive (target, category);
 }
 
 juce::Result KineticAudioProcessor::renamePreset (int index, const juce::String& newName)

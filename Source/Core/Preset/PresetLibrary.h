@@ -8,7 +8,7 @@ namespace kinetic::presets
 {
 
 /**
-    One entry in the preset folder: the built-in factory reset, or one file.
+    One entry in the preset folder: the built-in factory reset, or one file in a category.
 
     The factory entry has no file, so it can be selected and loaded but never written to, which
     is what keeps the reset available after a preset has been overwritten.
@@ -16,17 +16,22 @@ namespace kinetic::presets
 struct Entry
 {
     juce::String name;
+    juce::String category;
     juce::File file;                // empty for the factory entry
     bool isFactory = false;
 };
 
 /**
-    The preset folder: one document per preset, in the user's Application Support directory.
+    The preset folder: one sub-folder per category, one document per preset.
 
     A preset is the same document the host stores in its session (see patternstate), wrapped in a
     <KINETIC_PRESET> element that carries the format, its version and the preset's name. Nothing
     new is serialised for presets: a preset and a saved session hold identical pattern data, so a
     preset can be inspected, backed up or copied between machines as plain text.
+
+    Categories are the immediate sub-folders of the library. The default category, "User", is the
+    library root itself, so a folder written before categories existed keeps working and no file
+    has to move; every other category is a folder of its own and can be exported on its own.
 
     The library is a snapshot of the folder taken by reload(); a file added or removed behind the
     plug-in's back is picked up by refreshIfChanged(), which compares the folder's timestamp and
@@ -40,7 +45,7 @@ class Library
 public:
     explicit Library (juce::File rootDirectory = defaultDirectory());
 
-    /** Re-reads the folder: the factory entry first, then every preset by name. */
+    /** Re-reads the folder: the factory entry first, then every preset by category and name. */
     void reload();
 
     /**
@@ -55,6 +60,9 @@ public:
     const juce::Array<Entry>& entries() const noexcept { return list; }
     juce::File directory() const noexcept { return root; }
 
+    /** Every category, the default one included, sorted by name. */
+    juce::StringArray categories() const;
+
     /**
         The entry holding `file`, or -1 when the folder has no such file.
 
@@ -65,15 +73,16 @@ public:
     int indexOfFile (const juce::File& file) const;
 
     /**
-        Writes `pattern` as a preset called `name`.
+        Writes `pattern` as a preset called `name` in `category`.
 
         When `replacing` points at an existing preset its file is overwritten and the name is
-        kept as given; otherwise a free file name is chosen, so two presets may share a display
-        name without one silently replacing the other. `savedFile` receives the file that now
-        holds the preset.
+        kept as given; otherwise a free file name is chosen in the category's folder, so two
+        presets may share a display name without one silently replacing the other. `savedFile`
+        receives the file that now holds the preset.
     */
     juce::Result save (const Pattern& pattern, int selectedLane, const juce::String& name,
-                       const juce::File& replacing = {}, juce::File* savedFile = nullptr);
+                       const juce::File& replacing = {}, juce::File* savedFile = nullptr,
+                       const juce::String& category = defaultCategoryName);
 
     /** Reads `entry` into `pattern` and `selectedLane`; on failure both are left untouched. */
     bool load (const Entry& entry, Pattern& pattern, int& selectedLane) const;
@@ -87,11 +96,10 @@ public:
     /** Copies one preset document to `target`, which may be anywhere on disk. */
     juce::Result exportPreset (const Entry& entry, const juce::File& target) const;
 
-    /** Writes every preset in the folder into a single archive document. */
-    juce::Result exportArchive (const juce::File& target,
-                                const juce::String& name = "KINETIC Presets") const;
+    /** Writes every preset of one category into a single archive named after it. */
+    juce::Result exportArchive (const juce::File& target, const juce::String& category) const;
 
-    /** What an import does with a preset whose name is already in the folder. */
+    /** What an import does with a preset whose name is already in the category. */
     enum class ImportPolicy
     {
         skip,           // leave the existing preset alone
@@ -108,37 +116,50 @@ public:
     };
 
     /**
-        Imports preset documents and folder archives, in any order.
+        Imports preset documents and category archives, in any order.
 
-        A name already in the folder follows `policy`: kept alongside under "<name> version",
-        replaced in place, or left as it is.
+        A single preset goes into `fallbackCategory`. An archive goes into the category it is
+        named after, which is created when it does not exist yet, so a folder can be moved
+        between machines one category at a time. A name already in the target category follows
+        `policy`.
     */
     ImportSummary importFrom (const juce::Array<juce::File>& sources,
-                              ImportPolicy policy = ImportPolicy::keepBoth);
+                              ImportPolicy policy = ImportPolicy::keepBoth,
+                              const juce::String& fallbackCategory = defaultCategoryName);
+
+    /** Creates an empty category, so presets can be saved into it. */
+    juce::Result createCategory (const juce::String& name);
 
     /** `~/Library/Application Support/KINETIC/Presets`. */
     static juce::File defaultDirectory();
 
-    /** A name that is safe to use as a file name, or `fallback` when nothing is left. */
+    /** A name that is safe to use as a file or folder name, or `fallback` when nothing is left. */
     static juce::String sanitiseName (const juce::String& name,
                                       const juce::String& fallback = "Preset");
 
     static constexpr const char* fileExtension = "kineticpreset";
     static constexpr const char* archiveExtension = "kineticset";
     static constexpr const char* factoryName = "FACTORY DEFAULT";
+    static constexpr const char* defaultCategoryName = "User";
 
 private:
-    juce::File fileForName (const juce::String& name) const;
+    /** The folder a category is stored in; the default category lives in the library root. */
+    juce::File categoryDirectory (const juce::String& category) const;
+
+    void addPresetsFrom (const juce::File& folder, const juce::String& category);
+
+    juce::File fileForName (const juce::String& name, const juce::String& category) const;
     static juce::String readName (const juce::File& file);
 
-    /** Writes one preset document into this folder. Refuses a document it cannot read.
+    /** Writes one preset document into `category`. Refuses a document it cannot read.
         `imported` says whether anything was written, so a skipped preset is not counted. */
-    juce::Result importElement (const juce::XmlElement& xml, ImportPolicy policy, bool& imported);
+    juce::Result importElement (const juce::XmlElement& xml, ImportPolicy policy,
+                                const juce::String& category, bool& imported);
 
-    /** The entry called `name`, ignoring the factory entry, or -1. */
-    int entryNamed (const juce::String& name) const;
-    bool nameExists (const juce::String& name) const;
-    juce::String versionedName (const juce::String& name) const;
+    /** The entry called `name` in `category`, ignoring the factory entry, or -1. */
+    int entryNamed (const juce::String& name, const juce::String& category) const;
+    bool nameExists (const juce::String& name, const juce::String& category) const;
+    juce::String versionedName (const juce::String& name, const juce::String& category) const;
 
     juce::File root;
     juce::Array<Entry> list;

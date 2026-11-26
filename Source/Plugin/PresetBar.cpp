@@ -128,6 +128,17 @@ int PresetBar::currentIndexOrFactory() const
     return juce::jlimit (0, juce::jmax (0, processor.getPresetEntries().size() - 1), currentIndex);
 }
 
+juce::String PresetBar::currentCategory() const
+{
+    const auto entries = processor.getPresetEntries();
+    const auto index = currentIndexOrFactory();
+
+    if (juce::isPositiveAndBelow (index, entries.size()) && ! entries[index].isFactory)
+        return entries[index].category;
+
+    return presets::Library::defaultCategoryName;
+}
+
 void PresetBar::refreshName()
 {
     const auto entries = processor.getPresetEntries();
@@ -180,29 +191,49 @@ void PresetBar::showMenu()
                                     || entries[selected].isFactory;
 
     juce::PopupMenu menu;
+    juce::String lastHeader;
 
     for (int i = 0; i < entries.size(); ++i)
+    {
+        // Presets are read by category, so a header per folder keeps a long list navigable.
+        const auto header = entries[i].isFactory ? juce::String ("FACTORY") : entries[i].category;
+
+        if (header != lastHeader)
+        {
+            lastHeader = header;
+            menu.addSectionHeader (header);
+        }
+
         menu.addItem (i + 1, entries[i].name, true, i == selected);
+    }
 
     menu.addSeparator();
 
+    const auto categories = processor.getCategories();
+
     // The import policy is chosen up front rather than asked after the file picker, so what will
-    // happen to a name that is already in the folder is never a surprise.
+    // happen to a name that is already in the category is never a surprise.
     juce::PopupMenu importMenu;
     importMenu.addItem (1010, "Keep Both Presets");
     importMenu.addItem (1011, "Replace Existing Presets");
     importMenu.addItem (1012, "Skip Existing Presets");
     menu.addSubMenu ("Import presets...", importMenu);
 
+    juce::PopupMenu exportMenu;
+
+    for (int i = 0; i < categories.size(); ++i)
+        exportMenu.addItem (2001 + i, categories[i]);
+
     menu.addItem (1002, "Export this preset...", ! factorySelected);
-    menu.addItem (1003, "Export folder...");
+    menu.addSubMenu ("Export category...", exportMenu);
+    menu.addItem (1004, "New category...");
     menu.addItem (1000, "Reveal folder in Finder");
 
     juce::Component::SafePointer<PresetBar> safeThis (this);
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&nameButton)
                             .withParentComponent (getTopLevelComponent()),
-                        [safeThis] (int result)
+                        [safeThis, categories] (int result)
                         {
                             if (safeThis == nullptr || result <= 0)
                                 return;
@@ -210,6 +241,12 @@ void PresetBar::showMenu()
                             if (result == 1000)
                             {
                                 safeThis->processor.getPresetFolder().revealToUser();
+                                return;
+                            }
+
+                            if (result == 1004)
+                            {
+                                safeThis->promptNewCategory();
                                 return;
                             }
 
@@ -222,15 +259,15 @@ void PresetBar::showMenu()
                                 return;
                             }
 
-                            if (result == 1002)
+                            if (result >= 2001 && result <= 2000 + categories.size())
                             {
-                                safeThis->exportCurrentPreset();
+                                safeThis->exportCategory (categories[result - 2001]);
                                 return;
                             }
 
-                            if (result == 1003)
+                            if (result == 1002)
                             {
-                                safeThis->exportFolder();
+                                safeThis->exportCurrentPreset();
                                 return;
                             }
 
@@ -250,7 +287,8 @@ void PresetBar::saveCurrent()
     }
 
     int program = 0;
-    const auto result = processor.savePreset (entries[index].name, index, &program);
+    const auto result = processor.savePreset (entries[index].name, index, entries[index].category,
+                                             &program);
 
     if (result.failed())
     {
@@ -265,17 +303,58 @@ void PresetBar::promptSaveAs()
 {
     const auto entries = processor.getPresetEntries();
     const auto index = currentIndexOrFactory();
+    const auto categories = processor.getCategories();
+    const auto category = currentCategory();
+
     const auto suggested = juce::isPositiveAndBelow (index, entries.size())
                                    && ! entries[index].isFactory
                                ? entries[index].name
                                : juce::String ("My Pattern");
 
     auto* alert = new juce::AlertWindow ("Save preset",
-                                         "Name for this preset. It is written to "
+                                         "Name and category for this preset. It is written to "
                                              + processor.getPresetFolder().getFullPathName(),
                                          juce::MessageBoxIconType::NoIcon);
     alert->addTextEditor ("name", suggested, "Name");
+    alert->addComboBox ("category", categories, "Category");
+
+    if (auto* box = alert->getComboBoxComponent ("category"))
+        box->setSelectedItemIndex (juce::jmax (0, categories.indexOf (category)),
+                                   juce::dontSendNotification);
+
     alert->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    alert->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    juce::Component::SafePointer<juce::AlertWindow> alertRef (alert);
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+
+    alert->enterModalState (true, juce::ModalCallbackFunction::create (
+                                [safeThis, alertRef, categories, category] (int result)
+                                {
+                                    if (safeThis == nullptr || alertRef == nullptr || result != 1)
+                                        return;
+
+                                    auto chosenCategory = category;
+
+                                    if (auto* box = alertRef->getComboBoxComponent ("category"))
+                                        if (juce::isPositiveAndBelow (box->getSelectedItemIndex(),
+                                                                      categories.size()))
+                                            chosenCategory = categories[box->getSelectedItemIndex()];
+
+                                    safeThis->saveAs (alertRef->getTextEditorContents ("name"),
+                                                      chosenCategory);
+                                }), true);
+}
+
+void PresetBar::promptNewCategory()
+{
+    auto* alert = new juce::AlertWindow ("New category",
+                                         "Name for a new preset category. It becomes a folder in "
+                                             + processor.getPresetFolder().getFullPathName()
+                                             + ", so presets can be moved one category at a time.",
+                                         juce::MessageBoxIconType::NoIcon);
+    alert->addTextEditor ("name", "Category", "Name");
+    alert->addButton ("Create", 1, juce::KeyPress (juce::KeyPress::returnKey));
     alert->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
 
     juce::Component::SafePointer<juce::AlertWindow> alertRef (alert);
@@ -287,14 +366,22 @@ void PresetBar::promptSaveAs()
                                     if (safeThis == nullptr || alertRef == nullptr || result != 1)
                                         return;
 
-                                    safeThis->saveAs (alertRef->getTextEditorContents ("name"));
+                                    if (const auto created = safeThis->processor.createCategory (
+                                            alertRef->getTextEditorContents ("name"));
+                                        created.failed())
+                                    {
+                                        safeThis->showError (created.getErrorMessage());
+                                        return;
+                                    }
+
+                                    safeThis->reloadLibrary();
                                 }), true);
 }
 
-void PresetBar::saveAs (const juce::String& name)
+void PresetBar::saveAs (const juce::String& name, const juce::String& category)
 {
     int program = 0;
-    const auto result = processor.savePreset (name, -1, &program);
+    const auto result = processor.savePreset (name, -1, category, &program);
 
     if (result.failed())
     {
@@ -368,7 +455,8 @@ void PresetBar::importPresets (presets::Library::ImportPolicy policy)
                                   if (files.isEmpty())
                                       return;
 
-                                  const auto summary = safeThis->processor.importPresets (files, policy);
+                                  const auto summary = safeThis->processor.importPresets (
+                                      files, policy, safeThis->currentCategory());
                                   safeThis->reloadLibrary();
 
                                   juce::String message;
@@ -425,20 +513,21 @@ void PresetBar::exportCurrentPreset()
                               });
 }
 
-void PresetBar::exportFolder()
+void PresetBar::exportCategory (const juce::String& category)
 {
     fileChooser = std::make_unique<juce::FileChooser> (
-        "Export preset folder",
+        "Export category",
         juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
-            .getChildFile ("KINETIC Presets")
+            .getChildFile (category)
             .withFileExtension (presets::Library::archiveExtension),
         juce::String ("*.") + presets::Library::archiveExtension);
 
     juce::Component::SafePointer<PresetBar> safeThis (this);
+    const auto exportedCategory = category;
 
     fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
                                   | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [safeThis] (const juce::FileChooser& chooser)
+                              [safeThis, exportedCategory] (const juce::FileChooser& chooser)
                               {
                                   if (safeThis == nullptr)
                                       return;
@@ -448,7 +537,8 @@ void PresetBar::exportFolder()
                                   if (target == juce::File())
                                       return;
 
-                                  if (const auto result = safeThis->processor.exportFolder (target);
+                                  if (const auto result = safeThis->processor.exportCategory (
+                                          exportedCategory, target);
                                       result.failed())
                                       safeThis->showError (result.getErrorMessage());
                               });

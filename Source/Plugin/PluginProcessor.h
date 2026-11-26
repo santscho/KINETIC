@@ -71,21 +71,28 @@ public:
     /** Loads preset `index` into the pattern and makes it the current program. */
     bool applyPreset (int index);
 
-    /** Writes the pattern as a preset. `replacing` is a program index, or -1 for a new file. */
-    juce::Result savePreset (const juce::String& name, int replacing,
+    /** Writes the pattern as a preset in `category`. `replacing` is a program index, or -1. */
+    juce::Result savePreset (const juce::String& name, int replacing, const juce::String& category,
                              int* savedProgram = nullptr);
+
+    /** The preset categories, the default one included. */
+    juce::StringArray getCategories() const { return presetLibrary.categories(); }
+
+    juce::Result createCategory (const juce::String& name);
 
     juce::Result deletePreset (int index);
     juce::Result renamePreset (int index, const juce::String& newName);
 
-    /** Imports preset documents and folder archives; `policy` decides what a name clash does. */
+    /** Imports preset documents and category archives; `policy` decides what a name clash does.
+        A single preset goes into `fallbackCategory`. */
     presets::Library::ImportSummary importPresets (
         const juce::Array<juce::File>& sources,
-        presets::Library::ImportPolicy policy = presets::Library::ImportPolicy::keepBoth);
+        presets::Library::ImportPolicy policy = presets::Library::ImportPolicy::keepBoth,
+        const juce::String& fallbackCategory = presets::Library::defaultCategoryName);
 
-    /** Copies one preset, or the whole folder as an archive, to any location on disk. */
+    /** Copies one preset, or one category as an archive, to any location on disk. */
     juce::Result exportPreset (int index, const juce::File& target) const;
-    juce::Result exportFolder (const juce::File& target) const;
+    juce::Result exportCategory (const juce::String& category, const juce::File& target) const;
 
     /** Re-reads the folder and tells the host the program list changed. */
     void refreshPresetList();
