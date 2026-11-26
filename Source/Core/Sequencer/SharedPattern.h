@@ -44,6 +44,13 @@ public:
         slots[static_cast<std::size_t> (writerSlot)] = editable;
         writerSlot = shared.exchange (writerSlot, std::memory_order_acq_rel);
         dirty.store (true, std::memory_order_release);
+        editRevision.fetch_add (1, std::memory_order_relaxed);
+    }
+
+    /** Message thread: how often the pattern was published, for "modified since loaded" marks. */
+    juce::uint32 revision() const noexcept
+    {
+        return editRevision.load (std::memory_order_relaxed);
     }
 
     /** Audio thread: the newest publication, or nullptr when nothing has changed. */
@@ -67,6 +74,7 @@ private:
     // than on the reader's, and every exchange swaps two distinct values.
     std::atomic<int> shared { 2 };      // the published-but-unread slot
     std::atomic<bool> dirty { false };
+    std::atomic<juce::uint32> editRevision { 0 };
     int writerSlot = 0;                 // message thread's private slot
     int readerSlot = 1;                 // audio thread's private slot
 

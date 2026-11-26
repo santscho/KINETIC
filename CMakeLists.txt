@@ -133,7 +133,8 @@ if (KINETIC_BUILD_TESTS)
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/TimingEngineTests.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SequencerTests.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/Tests/SharedPatternTests.cpp"
-                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/PatternStateTests.cpp")
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/PatternStateTests.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/Tests/PresetLibraryTests.cpp")
 endif()
 
 #-------------------------------------------------------------------------------

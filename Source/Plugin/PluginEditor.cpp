@@ -7,7 +7,8 @@ namespace kinetic
 
 KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor& p)
     : juce::AudioProcessorEditor (&p), audioProcessor (p),
-      patternEditor (p.getSharedPattern(), p.getSelectedLane())
+      patternEditor (p.getSharedPattern(), p.getSelectedLane()),
+      presetBar (p.getSharedPattern(), p.getSelectedLane())
 {
     setOpaque (true);
     setResizable (true, true);
@@ -20,8 +21,12 @@ KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor&
         audioProcessor.postUiCommand ({ kinetic::UiCommandType::allNotesOff, 0 });
     };
 
+    // A loaded preset replaces the pattern and the lane being edited, so the panel re-reads both.
+    presetBar.onPresetLoaded = [this] { patternEditor.refreshAll(); };
+
     addAndMakeVisible (panicButton);
     addAndMakeVisible (patternEditor);
+    addAndMakeVisible (presetBar);
 
     startTimerHz (20);
 }
@@ -61,7 +66,13 @@ void KineticAudioProcessorEditor::paint (juce::Graphics& g)
 void KineticAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds().reduced (16, 14);
-    area.removeFromTop (38);
+
+    // The preset browser shares the header row with the title and the format badge.
+    auto header = area.removeFromTop (28);
+    auto presetArea = header.removeFromRight (juce::jmin (420, juce::jmax (280, header.getWidth() - 200)));
+    presetBar.setBounds (presetArea.withSizeKeepingCentre (presetArea.getWidth(), 24));
+
+    area.removeFromTop (10);
 
     footerArea = area.removeFromBottom (26);
     panicButton.setBounds (footerArea.removeFromRight (74));
@@ -100,8 +111,10 @@ void KineticAudioProcessorEditor::timerCallback()
     {
         lastPatternRevision = revision;
         patternEditor.refreshAll();
+        presetBar.markModified();      // the host replaced the pattern, so no preset matches it
     }
 
+    presetBar.refreshDirtyState();
     repaint (0, getHeight() - 62, getWidth(), 62);
 }
 

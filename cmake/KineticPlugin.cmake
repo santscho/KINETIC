@@ -21,7 +21,9 @@ set (KINETIC_CORE_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.h"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/Sequencer.cpp"
     "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/SharedPattern.h"
-    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/PatternState.h")
+    "${PROJECT_SOURCE_DIR}/Source/Core/Sequencer/PatternState.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Preset/PresetLibrary.h"
+    "${PROJECT_SOURCE_DIR}/Source/Core/Preset/PresetLibrary.cpp")
 
 set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Core/Timing/TransportEngine.h"
@@ -33,6 +35,8 @@ set (KINETIC_PLUGIN_SOURCES
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PatternEditor.cpp"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/StepGrid.h"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/StepGrid.cpp"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/PresetBar.h"
+    "${PROJECT_SOURCE_DIR}/Source/Plugin/PresetBar.cpp"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/Theme.h"
     "${PROJECT_SOURCE_DIR}/Source/Plugin/PluginEntry.cpp")
 
