@@ -1,5 +1,6 @@
 #include "PatternEditor.h"
 
+#include "Core/Sequencer/SequenceMath.h"
 #include "Theme.h"
 
 namespace kinetic
@@ -24,6 +25,14 @@ namespace
 
         const juce::StringArray scaleNames { "CHROMATIC", "MAJOR", "MINOR", "DORIAN",
                                          "PHRYGIAN DOM", "PENTATONIC" };
+
+    /** Rotates a C-anchored 12-bit pitch-class mask into the given key. */
+    juce::uint16 rotateMask (juce::uint16 mask, int root) noexcept
+    {
+        const auto shift = ((root % 12) + 12) % 12;
+
+        return static_cast<juce::uint16> (((mask << shift) | (mask >> (12 - shift))) & 0x0fff);
+    }
 
     // C3 is note 60, the naming the manual and every host use.
     juce::String noteName (int note)
@@ -151,6 +160,7 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
     {
         shared.edit().globalRoot = juce::jlimit (0, 11, keyBox.getSelectedId() - 1);
         commit();
+        refreshControls();      // the key decides which notes the root list offers
     };
     addAndMakeVisible (keyBox);
 
@@ -163,6 +173,7 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
         const auto index = juce::jlimit (0, numScaleTypes - 1, scaleBox.getSelectedId() - 1);
         shared.edit().globalScale = scaleOrder[index];
         commit();
+        refreshControls();      // the mode decides which notes the root list offers
     };
     addAndMakeVisible (scaleBox);
 
@@ -228,6 +239,13 @@ void PatternEditor::refreshControls()
 
     const auto& pattern = shared.edit();
 
+    const auto allowedNotes = pattern.scaleEnabled
+                                  ? rotateMask (math::scaleMask (pattern.globalScale,
+                                                                 pattern.customScaleMask),
+                                                pattern.globalRoot)
+                                  : static_cast<juce::uint16> (0x0fff);
+
+    rootNoteSelector.setAllowedNotes (allowedNotes);
     rootNoteSelector.setNote (pattern.rootNote);
     scaleButton.setToggleState (pattern.scaleEnabled, juce::dontSendNotification);
     scaleButton.setButtonText (pattern.scaleEnabled ? "SCALE ON" : "SCALE OFF");
@@ -346,16 +364,29 @@ void PatternEditor::RootNoteSelector::setNote (int newNote)
     rebuildItems();
 }
 
+void PatternEditor::RootNoteSelector::setAllowedNotes (juce::uint16 mask)
+{
+    allowedMask = static_cast<juce::uint16> (mask & 0x0fff);
+    rebuildItems();
+}
+
 void PatternEditor::RootNoteSelector::rebuildItems()
 {
-    // The list is always C1 to B1. The octave is not part of the entries: the buttons move it and
-    // the readout beside the list shows it, so a root of C3 reads `C1` with `OCT 3`.
+    // The list keeps the C1 to B1 naming and drops every note the scale does not allow, so with
+    // scale aware on it offers exactly the pitch classes a step may land on. The octave is not
+    // part of the entries: the buttons move it and the readout beside the list shows it, so a
+    // root of C3 reads `C1` with `OCT 3`.
     noteBox.clear (juce::dontSendNotification);
 
     for (int i = 0; i < 12; ++i)
-        noteBox.addItem (noteName (36 + i), i + 1);
+        if (((allowedMask >> i) & 1) != 0)
+            noteBox.addItem (noteName (36 + i), i + 1);
 
-    noteBox.setSelectedId ((note % 12) + 1, juce::dontSendNotification);
+    // A root outside the scale leaves the list unselected; its octave still reads below.
+    const auto wanted = (note % 12) + 1;
+
+    noteBox.setSelectedId (((allowedMask >> (wanted - 1)) & 1) != 0 ? wanted : 0,
+                           juce::dontSendNotification);
 
     repaint();
 }

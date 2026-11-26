@@ -30,8 +30,9 @@ public:
 
 private:
     /**
-        Root note of the pattern: a list of the twelve notes from C1 to B1 picks the note, and
-        the buttons on its left move the note's octave, which the readout beside the list shows.
+        Root note of the pattern: a list of notes from C1 to B1 picks the note, and the buttons
+        on its left move the note's octave, which the readout beside the list shows. With scale
+        aware on, the list only offers the pitch classes the scale allows.
     */
     class RootNoteSelector final : public juce::Component
     {
@@ -43,8 +44,11 @@ private:
 
         std::function<void (int)> onNoteChange;
 
-        /** Sets the note without notifying. The list always shows C1 to B1. */
+        /** Sets the note without notifying. The list keeps the C1 to B1 naming. */
         void setNote (int newNote);
+
+        /** 12-bit pitch-class mask of the notes the list may offer; 0x0fff offers every note. */
+        void setAllowedNotes (juce::uint16 mask);
 
     private:
         void shiftOctave (int direction);
@@ -53,6 +57,7 @@ private:
         juce::TextButton downButton { "-" }, upButton { "+" };
         juce::ComboBox noteBox;
         juce::Rectangle<int> octaveArea;
+        juce::uint16 allowedMask = 0x0fff;
         int note = 60;
     };
 

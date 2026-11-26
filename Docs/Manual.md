@@ -133,7 +133,7 @@ say the same as the table below.
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
-| Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. The list always holds `C1` to `B1`; `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
+| Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. The list names notes from `C1` to `B1`; with scale aware on it only offers the notes of the scale, and a root outside it leaves the list unselected. `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
 | Key | `C` … `B` | Key of the scale. |
 | Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
@@ -258,8 +258,9 @@ trigger.
 The modes are `chromatic`, `major`, `minor`, `dorian`, `phrygianDominant` and `pentatonic`; the
 state format also carries `custom` with a 12-bit mask (C = bit 0, default `0x0fff`) that no editor
 control sets yet. The key is one of the twelve pitch classes. Key, mode and switch are pattern-wide
-and apply to all eight lanes. Quantisation picks the nearest allowed pitch class and resolves ties
-upward, so `F#` in C major becomes `G`.
+and apply to all eight lanes, and the root note list only offers the pitch classes the chosen key
+and mode allow. Quantisation picks the nearest allowed pitch class and resolves ties upward, so
+`F#` in C major becomes `G`.
 
 ### 6.4 Sub-lane loop lengths
 
