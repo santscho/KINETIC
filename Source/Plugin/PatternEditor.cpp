@@ -19,11 +19,11 @@ namespace
     // Display order of the scales, which is not the enum order the state format stores.
     constexpr ScaleType scaleOrder[] = { ScaleType::chromatic, ScaleType::major, ScaleType::minor,
                                          ScaleType::dorian, ScaleType::phrygianDominant,
-                                         ScaleType::pentatonic, ScaleType::custom };
+                                         ScaleType::pentatonic };
     constexpr int numScaleTypes = static_cast<int> (sizeof (scaleOrder) / sizeof (scaleOrder[0]));
 
     const juce::StringArray scaleNames { "CHROMATIC", "MAJOR", "MINOR", "DORIAN",
-                                         "PHRYGIAN DOM", "PENTATONIC", "CUSTOM" };
+                                         "PHRYGIAN DOM", "PENTATONIC" };
 
     // C3 is note 60, the naming the manual and every host use.
     juce::String noteName (int note)
