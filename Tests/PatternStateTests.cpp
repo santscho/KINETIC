@@ -62,7 +62,7 @@ private:
     static bool patternsMatch (const Pattern& a, const Pattern& b)
     {
         if (a.globalScale != b.globalScale || a.globalRoot != b.globalRoot
-             || a.customScaleMask != b.customScaleMask)
+             || a.customScaleMask != b.customScaleMask || a.scaleEnabled != b.scaleEnabled)
             return false;
 
         for (std::size_t i = 0; i < a.lanes.size(); ++i)
@@ -76,6 +76,7 @@ private:
     static Pattern makeBusyPattern()
     {
         Pattern pattern;
+        pattern.scaleEnabled = true;
         pattern.globalScale = ScaleType::dorian;
         pattern.globalRoot = 3;
         pattern.customScaleMask = 0x0295;

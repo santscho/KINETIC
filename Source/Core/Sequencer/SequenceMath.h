@@ -96,7 +96,7 @@ inline juce::uint16 scaleMask (ScaleType type, juce::uint16 customMask) noexcept
         case ScaleType::major:            return 0x0ab5;   // 0 2 4 5 7 9 11
         case ScaleType::minor:            return 0x05ad;   // 0 2 3 5 7 8 10
         case ScaleType::dorian:           return 0x06ad;   // 0 2 3 5 7 9 10
-        case ScaleType::phrygianDominant: return 0x059b;   // 0 1 4 5 7 8 10
+        case ScaleType::phrygianDominant: return 0x05b3;   // 0 1 4 5 7 8 10
         case ScaleType::pentatonic:       return 0x0295;   // 0 2 4 7 9
         case ScaleType::custom:           return static_cast<juce::uint16> (customMask & 0x0fffu);
         case ScaleType::chromatic:        break;

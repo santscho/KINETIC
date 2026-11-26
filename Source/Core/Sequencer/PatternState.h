@@ -27,6 +27,7 @@ inline void writeToXml (const Pattern& pattern, int selectedLane, juce::XmlEleme
     element->setAttribute ("globalScale", static_cast<int> (pattern.globalScale));
     element->setAttribute ("globalRoot", pattern.globalRoot);
     element->setAttribute ("customMask", static_cast<int> (pattern.customScaleMask));
+    element->setAttribute ("scaleEnabled", pattern.scaleEnabled ? 1 : 0);
 
     const Step defaults;
 
@@ -143,6 +144,7 @@ inline bool readFromXml (const juce::XmlElement& parent, Pattern& pattern, int& 
     pattern.globalRoot = element->getIntAttribute ("globalRoot", pattern.globalRoot);
     pattern.customScaleMask = static_cast<juce::uint16> (
         element->getIntAttribute ("customMask", static_cast<int> (pattern.customScaleMask)));
+    pattern.scaleEnabled = element->getIntAttribute ("scaleEnabled", 0) != 0;
 
     for (const auto* laneElement : element->getChildIterator())
     {

@@ -326,9 +326,13 @@ void Sequencer::emitStep (const Lane& lane, LaneRuntime& rt, double startPpq,
         return;
     }
 
-    const auto mask = math::scaleMask (settings.useGlobalScale ? pattern.globalScale
-                                                               : settings.scale,
-                                       pattern.customScaleMask);
+    // Scale aware is the master switch: switched off, every note lands exactly on the painted
+    // pitch whatever the lane or global scale says, so the quantiser is a no-op.
+    const auto mask = pattern.scaleEnabled
+                          ? math::scaleMask (settings.useGlobalScale ? pattern.globalScale
+                                                                     : settings.scale,
+                                             pattern.customScaleMask)
+                          : static_cast<juce::uint16> (0x0fff);
     const auto root = settings.useGlobalScale ? pattern.globalRoot : settings.scaleRoot;
 
     const auto note = juce::jlimit (0, 127,
