@@ -24,7 +24,9 @@ It does **not**:
 - respond to MIDI input — notes played on a keyboard or drawn in the host's piano roll are
   ignored. The pattern in the editor is the only source of notes;
 - talk to the network or load samples. Its only contact with the filesystem is the preset folder
-  (§4.6), which it reads when the list opens and writes only when you save or delete a preset.
+  (§4.6), which it reads when the list opens and touches only when you save, move, rename or
+  delete a preset or a category, and which it refuses to touch at all where a file that is not a
+  preset is in the way.
 
 ---
 
@@ -219,13 +221,17 @@ The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE 
 
 - `‹` and `›` step through the list and wrap at either end; clicking the name opens the whole
   list, grouped by category under `FACTORY` and a heading per folder, with `Import presets…`,
-  `Move to…`, `Export this preset…`, `Export category…`, `New category…` and `Reveal folder in
-  Finder` below it. The arrows ignore categories and walk the whole list, so a category never
-  traps them.
+  `Move to…`, `Export this preset…`, `Export category…`, `New category…`, `Rename category…`,
+  `Delete empty category…` and `Reveal folder in Finder` below it. The arrows ignore categories and
+  walk the whole list, so a category never traps them.
 - `Move to…` lists the categories other than the one the preset is in and moves it there, keeping
   its name and its pattern. The preset stays the one being shown, and a project saved afterwards
   remembers it in its new category; moving the preset the session is on never drops the selection
   to `FACTORY DEFAULT`.
+- `Rename category…` and `Delete empty category…` tidy the folders themselves: the first renames
+  one together with every preset in it, the second removes one that holds no preset. Both refuse a
+  folder holding anything that is not a preset, and neither applies to the default category — see
+  **Categories** below for what that means for a session.
 - `SAVE` overwrites the file the current preset came from. `SAVE AS` asks for a name and a
   category and writes a new file there. Both store the whole pattern — all eight lanes with all 64 steps, plus the
   pattern-wide transpose, scale and meter — and the lane the editor was showing.
@@ -273,16 +279,16 @@ then by name, so two categories may hold a preset of the same name.
 `Rename category…` renames a folder with every preset inside it: each preset keeps its name and
 its file name, so nothing that refers to it has to change — a project that was saved before the
 rename still opens on its preset, found by that file name. A name already in use is refused
-rather than merging two folders, and a folder that holds anything besides presets — a note, a
-rendering, a subfolder — is refused as well, since moving a category is not a reason to move
-files the plug-in did not write. The default category is the preset folder that holds the other
-categories, so `Rename category…` does not list it and renaming it is refused.
-`Delete empty category…` lists the categories that hold no
+rather than merging two folders. `Delete empty category…` lists the categories that hold no
 preset and removes the folder after asking; a category with presets in it has to be emptied with
-`Move to…` or `DEL` first, and the default category cannot be deleted. Deleting applies the same
-rule as renaming: a folder holding anything besides presets is refused, the message names the
-item, so a category operation never removes or moves a file the plug-in did not write; move that
-item elsewhere in Finder and try again.
+`Move to…` or `DEL` first.
+
+Both operations act on the folder, not on individual files, so both refuse a folder that holds
+anything besides presets — a note, a rendering, a subfolder — and the message names the item.
+Renaming is not a reason to move a file the plug-in did not write, and deleting is not a reason to
+remove one; move that item elsewhere in Finder and try again. The default category is the preset
+folder that holds the other categories, so it is never renamed — `Rename category…` does not list
+it — and it is never deleted either.
 
 Presets and the host session are independent: the session always stores the pattern itself, so a
 preset is a starting point and no session depends on a preset file still being there.
