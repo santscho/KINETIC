@@ -45,6 +45,15 @@ public:
     juce::File directory() const noexcept { return root; }
 
     /**
+        The entry holding `file`, or -1 when the folder has no such file.
+
+        Entry numbers move whenever a preset is added, removed or renamed, so anything that holds
+        on to one - the current program, for instance - has to be found again by its file. The
+        factory entry has no file and is always entry 0.
+    */
+    int indexOfFile (const juce::File& file) const;
+
+    /**
         Writes `pattern` as a preset called `name`.
 
         When `replacing` points at an existing preset its file is overwritten and the name is
