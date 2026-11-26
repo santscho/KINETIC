@@ -31,6 +31,10 @@ Library::Library (juce::File rootDirectory)
 
 void Library::reload()
 {
+    // Taken before the scan: a change during it leaves the stamps different, which costs one more
+    // re-read later rather than silently missing the change.
+    folderStamp = root.getLastModificationTime();
+
     list.clearQuick();
 
     Entry factory;
@@ -61,6 +65,22 @@ void Library::reload()
 
         return a.name.compareIgnoreCase (b.name) < 0;
     });
+}
+
+bool Library::refreshIfChanged (int minimumIntervalMs)
+{
+    const auto now = juce::Time::getMillisecondCounter();
+
+    if (now - lastCheckMs < static_cast<juce::uint32> (juce::jmax (0, minimumIntervalMs)))
+        return false;
+
+    lastCheckMs = now;
+
+    if (root.getLastModificationTime() == folderStamp)
+        return false;
+
+    reload();
+    return true;
 }
 
 int Library::indexOfFile (const juce::File& file) const

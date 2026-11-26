@@ -29,9 +29,11 @@ struct Entry
     preset can be inspected, backed up or copied between machines as plain text.
 
     The library is a snapshot of the folder taken by reload(); a file added or removed behind the
-    plug-in's back is picked up the next time the list is read. Only files that parse as a KINETIC
-    preset appear in the list, so unrelated documents in the folder are ignored rather than
-    offered as broken presets.
+    plug-in's back is picked up by refreshIfChanged(), which compares the folder's timestamp and
+    re-reads it at most once per interval. That is what keeps a host's program list current
+    without turning a per-query read into a folder scan. Only files that parse as a KINETIC
+    preset appear in the list, so unrelated documents are ignored rather than offered as broken
+    presets.
 */
 class Library
 {
@@ -40,6 +42,15 @@ public:
 
     /** Re-reads the folder: the factory entry first, then every preset by name. */
     void reload();
+
+    /**
+        Re-reads the folder when its timestamp moved, at most once every `minimumIntervalMs`.
+
+        Returns true when the list was re-read. Callers that answer a host's program queries on
+        every refresh of a menu use this instead of reload(), so the folder is stat-ed rather
+        than scanned while nothing changes.
+    */
+    bool refreshIfChanged (int minimumIntervalMs = 500);
 
     const juce::Array<Entry>& entries() const noexcept { return list; }
     juce::File directory() const noexcept { return root; }
@@ -89,6 +100,10 @@ private:
 
     juce::File root;
     juce::Array<Entry> list;
+
+    // The folder's timestamp when it was last read, and when it was last checked.
+    juce::Time folderStamp;
+    juce::uint32 lastCheckMs = 0;
 
     JUCE_DECLARE_NON_COPYABLE (Library)
 };
