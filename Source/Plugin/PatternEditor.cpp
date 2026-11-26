@@ -1,6 +1,5 @@
 #include "PatternEditor.h"
 
-#include "Core/Sequencer/SequenceMath.h"
 #include "Theme.h"
 
 namespace kinetic
@@ -25,23 +24,6 @@ namespace
 
         const juce::StringArray scaleNames { "CHROMATIC", "MAJOR", "MINOR", "DORIAN",
                                          "PHRYGIAN DOM", "PENTATONIC" };
-
-    /** Rotates a C-anchored 12-bit pitch-class mask into the given key. */
-    juce::uint16 rotateMask (juce::uint16 mask, int root) noexcept
-    {
-        const auto shift = ((root % 12) + 12) % 12;
-
-        return static_cast<juce::uint16> (((mask << shift) | (mask >> (12 - shift))) & 0x0fff);
-    }
-
-    // C3 is note 60, the naming the manual and every host use.
-    juce::String noteName (int note)
-    {
-        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F",
-                                             "F#", "G", "G#", "A", "A#", "B" };
-
-        return juce::String (names[note % 12]) + juce::String (note / 12 - 2);
-    }
 } // namespace
 
 PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& selectedLaneRef)
@@ -160,7 +142,6 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
     {
         shared.edit().globalRoot = juce::jlimit (0, 11, keyBox.getSelectedId() - 1);
         commit();
-        refreshControls();      // the key decides which notes the root list offers
     };
     addAndMakeVisible (keyBox);
 
@@ -173,7 +154,6 @@ PatternEditor::PatternEditor (SharedPattern& sharedPattern, std::atomic<int>& se
         const auto index = juce::jlimit (0, numScaleTypes - 1, scaleBox.getSelectedId() - 1);
         shared.edit().globalScale = scaleOrder[index];
         commit();
-        refreshControls();      // the mode decides which notes the root list offers
     };
     addAndMakeVisible (scaleBox);
 
@@ -239,13 +219,6 @@ void PatternEditor::refreshControls()
 
     const auto& pattern = shared.edit();
 
-    const auto allowedNotes = pattern.scaleEnabled
-                                  ? rotateMask (math::scaleMask (pattern.globalScale,
-                                                                 pattern.customScaleMask),
-                                                pattern.globalRoot)
-                                  : static_cast<juce::uint16> (0x0fff);
-
-    rootNoteSelector.setAllowedNotes (allowedNotes);
     rootNoteSelector.setNote (pattern.rootNote);
     scaleButton.setToggleState (pattern.scaleEnabled, juce::dontSendNotification);
     scaleButton.setButtonText (pattern.scaleEnabled ? "SCALE ON" : "SCALE OFF");
@@ -271,6 +244,20 @@ void PatternEditor::resized()
 {
     auto area = getLocalBounds();
 
+    // Transpose and scale aware apply to the whole pattern, so they sit above the lane row,
+    // which only selects and enables the lane being edited.
+    auto globalRow = area.removeFromTop (24);
+
+    rootNoteSelector.setBounds (globalRow.removeFromLeft (100));
+    globalRow.removeFromLeft (14);
+    scaleButton.setBounds (globalRow.removeFromLeft (100).reduced (0, 1));
+    globalRow.removeFromLeft (8);
+    keyBox.setBounds (globalRow.removeFromLeft (66));
+    globalRow.removeFromLeft (6);
+    scaleBox.setBounds (globalRow.removeFromLeft (152));
+
+    area.removeFromTop (10);
+
     auto lanes = area.removeFromTop (26);
 
     for (auto* button : laneButtons)
@@ -288,17 +275,6 @@ void PatternEditor::resized()
     modifierBox.setBounds (controls.removeFromLeft (104));
     controls.removeFromLeft (10);
     directionBox.setBounds (controls.removeFromLeft (136));
-    controls.removeFromLeft (10);
-    rootNoteSelector.setBounds (controls.removeFromLeft (168));
-
-    area.removeFromTop (6);
-
-    auto scaleRow = area.removeFromTop (24);
-    scaleButton.setBounds (scaleRow.removeFromLeft (100).reduced (0, 1));
-    scaleRow.removeFromLeft (8);
-    keyBox.setBounds (scaleRow.removeFromLeft (66));
-    scaleRow.removeFromLeft (6);
-    scaleBox.setBounds (scaleRow.removeFromLeft (152));
 
     area.removeFromTop (8);
     grid.setBounds (area);
@@ -306,30 +282,14 @@ void PatternEditor::resized()
 
 PatternEditor::RootNoteSelector::RootNoteSelector()
 {
-    downButton.setTooltip ("Root note one octave down");
-    upButton.setTooltip ("Root note one octave up");
+    downButton.setTooltip ("Move the root note one octave down, every lane follows");
+    upButton.setTooltip ("Move the root note one octave up, every lane follows");
 
     downButton.onClick = [this] { shiftOctave (-1); };
     upButton.onClick = [this] { shiftOctave (1); };
 
     addAndMakeVisible (downButton);
     addAndMakeVisible (upButton);
-
-    noteBox.setTooltip ("Root note of the pattern, C1 to B1; the buttons set its octave");
-    noteBox.onChange = [this]
-    {
-        const auto base = note - (note % 12);
-        const auto selected = juce::jlimit (0, 11, noteBox.getSelectedId() - 1);
-
-        note = juce::jlimit (0, 127, base + selected);
-        repaint();
-
-        if (onNoteChange != nullptr)
-            onNoteChange (note);
-    };
-    addAndMakeVisible (noteBox);
-
-    rebuildItems();
 }
 
 void PatternEditor::RootNoteSelector::paint (juce::Graphics& g)
@@ -349,45 +309,17 @@ void PatternEditor::RootNoteSelector::paint (juce::Graphics& g)
 void PatternEditor::RootNoteSelector::resized()
 {
     auto area = getLocalBounds();
-    const auto buttonWidth = juce::jlimit (20, 26, area.getWidth() / 6);
+    constexpr int buttonWidth = 24;
 
     downButton.setBounds (area.removeFromLeft (buttonWidth).reduced (0, 1));
     upButton.setBounds (area.removeFromLeft (buttonWidth).reduced (1, 1));
 
-    octaveArea = area.removeFromRight (46).reduced (2, 1);
-    noteBox.setBounds (area.reduced (2, 0));
+    octaveArea = area.reduced (6, 1);
 }
 
 void PatternEditor::RootNoteSelector::setNote (int newNote)
 {
     note = juce::jlimit (0, 127, newNote);
-    rebuildItems();
-}
-
-void PatternEditor::RootNoteSelector::setAllowedNotes (juce::uint16 mask)
-{
-    allowedMask = static_cast<juce::uint16> (mask & 0x0fff);
-    rebuildItems();
-}
-
-void PatternEditor::RootNoteSelector::rebuildItems()
-{
-    // The list keeps the C1 to B1 naming and drops every note the scale does not allow, so with
-    // scale aware on it offers exactly the pitch classes a step may land on. The octave is not
-    // part of the entries: the buttons move it and the readout beside the list shows it, so a
-    // root of C3 reads `C1` with `OCT 3`.
-    noteBox.clear (juce::dontSendNotification);
-
-    for (int i = 0; i < 12; ++i)
-        if (((allowedMask >> i) & 1) != 0)
-            noteBox.addItem (noteName (36 + i), i + 1);
-
-    // A root outside the scale leaves the list unselected; its octave still reads below.
-    const auto wanted = (note % 12) + 1;
-
-    noteBox.setSelectedId (((allowedMask >> (wanted - 1)) & 1) != 0 ? wanted : 0,
-                           juce::dontSendNotification);
-
     repaint();
 }
 
@@ -400,7 +332,7 @@ void PatternEditor::RootNoteSelector::shiftOctave (int direction)
         return;
 
     note = shifted;
-    rebuildItems();
+    repaint();
 
     if (onNoteChange != nullptr)
         onNoteChange (note);
