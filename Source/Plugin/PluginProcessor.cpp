@@ -183,8 +183,10 @@ void KineticAudioProcessor::setStateInformation (const void* data, int sizeInByt
                                                          xml->getStringAttribute ("preset")),
                               std::memory_order_relaxed);
         updateProgramNames();
-        updateHostDisplay (
-            juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+
+        // Nothing here may call back into the host while it is still busy loading state, so the
+        // program-changed notification is raised for delivery after this call returns.
+        triggerAsyncUpdate();
     }
 }
 
@@ -245,6 +247,11 @@ void KineticAudioProcessor::updateProgramNames()
     currentProgram.store (juce::jlimit (0, juce::jmax (0, names.size() - 1),
                                         currentProgram.load (std::memory_order_relaxed)),
                           std::memory_order_relaxed);
+}
+
+void KineticAudioProcessor::handleAsyncUpdate()
+{
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
 }
 
 int KineticAudioProcessor::programIndexForFile (const juce::File& file) const
