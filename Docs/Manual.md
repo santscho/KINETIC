@@ -136,7 +136,7 @@ same as the table below.
 | Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and mode beside it. |
 | Key | `C` … `B` | Key of the scale. |
 | Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
-| Length (leftmost number box with +/−) | 1–64 | The lane's loop length. The grid always shows at least 16 columns; columns past the loop length are dimmed and are not played. |
+| Length (leftmost number box with +/−) | 1–64 | The lane's loop length. The grid always shows at least 16 columns and fits 32; a longer loop scrolls sideways. Columns past the loop length are dimmed and are not played. |
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
@@ -183,6 +183,10 @@ aware is on, so picking a note is enough to land on it.
 
 The columns are shaded in alternating groups of four, so beats are easy to follow. Step numbers
 appear in the header strip; when cells get narrow only every fourth number is drawn.
+
+A loop longer than 32 steps does not squeeze the cells: the columns keep the width they have at
+32 steps and the grid scrolls sideways, with a scroll bar along its bottom edge. The mouse wheel
+scrolls it too, and the row labels stay in place while the columns move.
 
 Steps beyond the loop length are still editable and are saved, but they are not played until the
 loop length covers them.
