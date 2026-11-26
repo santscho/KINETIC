@@ -578,19 +578,34 @@ private:
         expect (note.existsAsFile());
         expect (library.categories().contains ("Sketches"));
 
-        // Renaming keeps it where it is, and a subfolder is in the way just the same.
-        expect (library.renameCategory ("Sketches", "Ideas").wasOk());
+        // Renaming applies the same rule as deleting: the file is neither left behind as a
+        // stranded folder nor carried somewhere the user did not ask for, so the category keeps
+        // its name and its contents.
+        const auto refusedRename = library.renameCategory ("Sketches", "Ideas");
+        expect (refusedRename.failed());
+        expect (refusedRename.getErrorMessage().contains ("notes.txt"));
         expect (note.existsAsFile());
+        expect (library.categories().contains ("Sketches"));
+        expect (! library.categories().contains ("Ideas"));
+
+        // A subfolder is in the way just the same.
         expect (sketches.getChildFile ("older").createDirectory().wasOk());
+        expect (library.renameCategory ("Sketches", "Ideas").failed());
         expect (library.deleteCategory ("Sketches").failed());
         expect (sketches.getChildFile ("older").isDirectory());
 
-        // With only presets left in it - or nothing at all - the category goes.
-        expect (library.deleteCategory ("Ideas").wasOk());
+        // With nothing but presets in the folder - or nothing at all - both operations work, and
+        // the folder that is left behind is gone rather than listed as an empty category.
         expect (note.deleteFile());
         expect (sketches.getChildFile ("older").deleteRecursively());
-        expect (library.deleteCategory ("Sketches").wasOk());
+        expect (library.renameCategory ("Sketches", "Ideas").wasOk());
         expect (! sketches.isDirectory());
+
+        const auto ideas = library.directory().getChildFile ("Ideas");
+        expect (ideas.isDirectory());
+        expect (library.categories().contains ("Ideas"));
+        expect (library.deleteCategory ("Ideas").wasOk());
+        expect (! ideas.isDirectory());
     }
 
     void testRename()

@@ -154,7 +154,9 @@ public:
         Renames a category: every preset in it moves to the new folder under the same file name.
 
         Refuses a name that is already in use rather than merging two folders, which is what
-        importing is for. `renamedTo` receives the name the category now has.
+        importing is for. Like deleting, it refuses a folder that holds anything besides presets,
+        because moving a folder is not a reason to move files the plug-in did not write.
+        `renamedTo` receives the name the category now has.
     */
     juce::Result renameCategory (const juce::String& from, const juce::String& to,
                                  juce::String* renamedTo = nullptr);
