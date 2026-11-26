@@ -13,7 +13,8 @@ namespace kinetic
     The preset browser in the editor header.
 
     The name button opens the list of every preset in ~/Library/Application Support/KINETIC/Presets
-    with the factory reset at the top; the arrows step through the same list and wrap.
+    with the factory reset at the top and the presets grouped by category; the arrows step through
+    the same flat list and wrap, so a category never traps the arrows.
 
     The bar holds no state of its own beyond which program it is showing: loading, saving,
     renaming and deleting all go through the processor, which owns the library and the program
@@ -48,11 +49,12 @@ private:
     void showMenu();
     void saveCurrent();
     void promptSaveAs();
-    void saveAs (const juce::String& name);
+    void saveAs (const juce::String& name, const juce::String& category);
     void confirmDelete();
+    void promptNewCategory();
     void importPresets (presets::Library::ImportPolicy policy);
     void exportCurrentPreset();
-    void exportFolder();
+    void exportCategory (const juce::String& category);
     void showError (const juce::String& message) const;
     void showInfo (const juce::String& title, const juce::String& message) const;
 
@@ -60,6 +62,9 @@ private:
     void setDirty (bool shouldBeDirty);
     void refreshName();
     int currentIndexOrFactory() const;
+
+    /** The category of the preset being shown, or the default one for the factory entry. */
+    juce::String currentCategory() const;
 
     KineticAudioProcessor& processor;
 

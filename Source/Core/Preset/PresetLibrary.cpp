@@ -11,9 +11,9 @@ namespace
     constexpr const char* formatIdentifier = "kinetic.preset";
     constexpr int formatVersion = 1;
 
-    // A folder archive: one <KINETIC_PRESET> document per preset, under one element. It parses
-    // with the same per-preset reading a single file uses, which is what keeps exporting and
-    // importing free of a second pattern format.
+    // A category archive: one <KINETIC_PRESET> document per preset, under one element whose
+    // `name` is the category. It parses with the same per-preset reading a single file uses,
+    // which is what keeps exporting and importing free of a second pattern format.
     constexpr const char* archiveTag = "KINETIC_PRESETS";
     constexpr const char* archiveFormatIdentifier = "kinetic.presets";
     constexpr int archiveFormatVersion = 1;
@@ -50,28 +50,68 @@ void Library::reload()
     list.add (factory);
 
     if (root.isDirectory())
-        for (const auto& file : root.findChildFiles (juce::File::findFiles, false,
-                                                     juce::String ("*.") + fileExtension))
-        {
-            const auto name = readName (file);
+    {
+        // One folder per category, then the presets that sit directly in the library root: those
+        // are the default category, which is where they were before categories existed.
+        for (const auto& folder : root.findChildFiles (juce::File::findDirectories, false, "*"))
+            if (! folder.getFileName().startsWithChar ('.'))
+                addPresetsFrom (folder, sanitiseName (folder.getFileName(), defaultCategoryName));
 
-            if (name.isEmpty())
-                continue;       // not a KINETIC preset, so not a broken entry either
+        addPresetsFrom (root, defaultCategoryName);
+    }
 
-            Entry entry;
-            entry.name = name;
-            entry.file = file;
-            list.add (entry);
-        }
-
-    // The factory reset stays first; the rest read alphabetically, whatever the files are called.
+    // The factory reset stays first; everything else reads by category, then by name, so
+    // presets of one folder stay together in the host's program list.
     std::sort (list.begin(), list.end(), [] (const Entry& a, const Entry& b)
     {
         if (a.isFactory != b.isFactory)
             return a.isFactory;
 
+        const auto byCategory = a.category.compareIgnoreCase (b.category);
+
+        if (byCategory != 0)
+            return byCategory < 0;
+
         return a.name.compareIgnoreCase (b.name) < 0;
     });
+}
+
+juce::StringArray Library::categories() const
+{
+    juce::StringArray names { defaultCategoryName };
+
+    // Folders count even while empty, so a category created just before saving into it is there
+    // to be chosen.
+    if (root.isDirectory())
+        for (const auto& folder : root.findChildFiles (juce::File::findDirectories, false, "*"))
+            if (! folder.getFileName().startsWithChar ('.'))
+                names.addIfNotAlreadyThere (sanitiseName (folder.getFileName(),
+                                                          defaultCategoryName));
+
+    for (const auto& entry : list)
+        if (! entry.isFactory)
+            names.addIfNotAlreadyThere (entry.category);
+
+    names.sort (true);
+    return names;
+}
+
+void Library::addPresetsFrom (const juce::File& folder, const juce::String& category)
+{
+    for (const auto& file : folder.findChildFiles (juce::File::findFiles, false,
+                                                    juce::String ("*.") + fileExtension))
+    {
+        const auto name = readName (file);
+
+        if (name.isEmpty())
+            continue;       // not a KINETIC preset, so not a broken entry either
+
+        Entry entry;
+        entry.name = name;
+        entry.category = category;
+        entry.file = file;
+        list.add (entry);
+    }
 }
 
 bool Library::refreshIfChanged (int minimumIntervalMs)
@@ -112,8 +152,34 @@ juce::String Library::readName (const juce::File& file)
     return xml->getStringAttribute ("name").trim();
 }
 
+juce::File Library::categoryDirectory (const juce::String& category) const
+{
+    // The default category is the library root itself, so a folder that predates categories
+    // keeps its presets where they are and nothing has to move.
+    if (category.isEmpty() || category == defaultCategoryName)
+        return root;
+
+    return root.getChildFile (sanitiseName (category, defaultCategoryName));
+}
+
+juce::Result Library::createCategory (const juce::String& name)
+{
+    const auto cleanName = sanitiseName (name, "");
+
+    if (cleanName.isEmpty())
+        return juce::Result::fail ("A category must have a name.");
+
+    if (const auto created = categoryDirectory (cleanName).createDirectory(); created.failed())
+        return juce::Result::fail ("The category folder could not be created: "
+                                   + created.getErrorMessage());
+
+    reload();
+    return juce::Result::ok();
+}
+
 juce::Result Library::save (const Pattern& pattern, int selectedLane, const juce::String& name,
-                            const juce::File& replacing, juce::File* savedFile)
+                            const juce::File& replacing, juce::File* savedFile,
+                            const juce::String& category)
 {
     const auto cleanName = name.trim();
 
@@ -124,12 +190,17 @@ juce::Result Library::save (const Pattern& pattern, int selectedLane, const juce
         return juce::Result::fail ("The preset folder could not be created: "
                                    + created.getErrorMessage());
 
-    const auto target = replacing == juce::File() ? fileForName (cleanName) : replacing;
+    const auto target = replacing == juce::File() ? fileForName (cleanName, category) : replacing;
 
-    // Only ever write a direct child of the library: a stale entry from a moved folder must not
-    // turn a save into a write somewhere else on disk. The parent is compared rather than tested
-    // with isAChildOf(), which does not accept a path that has not been written yet.
-    if (target.getParentDirectory() != root)
+    if (target == juce::File())
+        return juce::Result::fail ("The preset folder could not be created.");
+
+    // Only ever write inside the library: a stale entry from a moved folder must not turn a save
+    // into a write somewhere else on disk. The parent is compared rather than tested with
+    // isAChildOf(), which does not accept a path that has not been written yet.
+    const auto parent = target.getParentDirectory();
+
+    if (parent != root && parent.getParentDirectory() != root)
         return juce::Result::fail ("The preset is outside the preset folder.");
 
     juce::XmlElement xml (rootTag);
@@ -214,9 +285,10 @@ juce::Result Library::rename (const Entry& entry, const juce::String& newName,
 
     // The new document is written before the old one goes, so a failed write cannot lose the
     // pattern. Renaming to the same file name only rewrites its name attribute.
-    const auto target = fileForName (cleanName);
+    const auto target = fileForName (cleanName, entry.category);
 
-    if (const auto result = save (pattern, lane, cleanName, target, renamedFile); result.failed())
+    if (const auto result = save (pattern, lane, cleanName, target, renamedFile, entry.category);
+        result.failed())
         return result;
 
     if (target != entry.file)
@@ -242,16 +314,18 @@ juce::Result Library::exportPreset (const Entry& entry, const juce::File& target
     return juce::Result::ok();
 }
 
-juce::Result Library::exportArchive (const juce::File& target, const juce::String& name) const
+juce::Result Library::exportArchive (const juce::File& target, const juce::String& category) const
 {
+    const auto exportedCategory = category.isEmpty() ? juce::String (defaultCategoryName) : category;
+
     juce::XmlElement archive (archiveTag);
     archive.setAttribute ("format", archiveFormatIdentifier);
     archive.setAttribute ("version", archiveFormatVersion);
-    archive.setAttribute ("name", name);
+    archive.setAttribute ("name", exportedCategory);
 
     for (const auto& entry : list)
     {
-        if (entry.isFactory)
+        if (entry.isFactory || entry.category != exportedCategory)
             continue;
 
         if (auto xml = juce::XmlDocument::parse (entry.file))
@@ -260,7 +334,7 @@ juce::Result Library::exportArchive (const juce::File& target, const juce::Strin
     }
 
     if (archive.getNumChildElements() == 0)
-        return juce::Result::fail ("The preset folder is empty, so there is nothing to export.");
+        return juce::Result::fail ("\"" + exportedCategory + "\" has no presets to export.");
 
     if (! archive.writeTo (target))
         return juce::Result::fail ("The archive could not be written to " + target.getFullPathName());
@@ -269,7 +343,8 @@ juce::Result Library::exportArchive (const juce::File& target, const juce::Strin
 }
 
 Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sources,
-                                             ImportPolicy policy)
+                                             ImportPolicy policy,
+                                             const juce::String& fallbackCategory)
 {
     ImportSummary summary;
 
@@ -290,9 +365,14 @@ Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sourc
 
             if (! archive)
             {
-                summary.failures.add (source.getFileName() + ": not a KINETIC preset folder");
+                summary.failures.add (source.getFileName() + ": not a KINETIC category archive");
                 continue;
             }
+
+            // An archive restores the folder it came from: the category it is named after, which
+            // is created when this machine does not have it yet.
+            const auto category = sanitiseName (xml->getStringAttribute ("name"),
+                                                defaultCategoryName);
 
             for (const auto* child : xml->getChildIterator())
             {
@@ -301,7 +381,8 @@ Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sourc
 
                 auto imported = false;
 
-                if (const auto result = importElement (*child, policy, imported); result.failed())
+                if (const auto result = importElement (*child, policy, category, imported);
+                    result.failed())
                     summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
                 else if (imported)
                     ++summary.imported;
@@ -312,9 +393,12 @@ Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sourc
             continue;
         }
 
+        // A single preset belongs to the category the editor is showing.
+        const auto category = fallbackCategory.isEmpty() ? juce::String (defaultCategoryName)
+                                                        : fallbackCategory;
         auto imported = false;
 
-        if (const auto result = importElement (*xml, policy, imported); result.failed())
+        if (const auto result = importElement (*xml, policy, category, imported); result.failed())
             summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
         else if (imported)
             ++summary.imported;
@@ -326,7 +410,7 @@ Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sourc
 }
 
 juce::Result Library::importElement (const juce::XmlElement& xml, ImportPolicy policy,
-                                     bool& imported)
+                                     const juce::String& category, bool& imported)
 {
     imported = false;
 
@@ -344,7 +428,7 @@ juce::Result Library::importElement (const juce::XmlElement& xml, ImportPolicy p
     if (name.isEmpty())
         name = "Imported";
 
-    if (const auto existing = entryNamed (name); existing >= 0)
+    if (const auto existing = entryNamed (name, category); existing >= 0)
     {
         switch (policy)
         {
@@ -358,7 +442,8 @@ juce::Result Library::importElement (const juce::XmlElement& xml, ImportPolicy p
                 const auto existingName = list[existing].name;
                 const auto existingFile = list[existing].file;
 
-                if (const auto result = save (pattern, lane, existingName, existingFile);
+                if (const auto result = save (pattern, lane, existingName, existingFile, nullptr,
+                                              category);
                     result.failed())
                     return result;
 
@@ -368,38 +453,39 @@ juce::Result Library::importElement (const juce::XmlElement& xml, ImportPolicy p
 
             case ImportPolicy::keepBoth:
             default:
-                name = versionedName (name);
+                name = versionedName (name, category);
                 break;
         }
     }
 
-    if (const auto result = save (pattern, lane, name, fileForName (name)); result.failed())
+    if (const auto result = save (pattern, lane, name, {}, nullptr, category); result.failed())
         return result;
 
     imported = true;
     return juce::Result::ok();
 }
 
-int Library::entryNamed (const juce::String& name) const
+int Library::entryNamed (const juce::String& name, const juce::String& category) const
 {
     for (int i = 0; i < list.size(); ++i)
-        if (! list[i].isFactory && list[i].name.equalsIgnoreCase (name))
+        if (! list[i].isFactory && list[i].category == category
+             && list[i].name.equalsIgnoreCase (name))
             return i;
 
     return -1;
 }
 
-bool Library::nameExists (const juce::String& name) const
+bool Library::nameExists (const juce::String& name, const juce::String& category) const
 {
-    return entryNamed (name) >= 0;
+    return entryNamed (name, category) >= 0;
 }
 
-juce::String Library::versionedName (const juce::String& name) const
+juce::String Library::versionedName (const juce::String& name, const juce::String& category) const
 {
     auto candidate = name + " version";
     auto suffix = 2;
 
-    while (nameExists (candidate))
+    while (nameExists (candidate, category))
     {
         candidate = name + " version " + juce::String (suffix);
         ++suffix;
@@ -434,16 +520,21 @@ juce::String Library::sanitiseName (const juce::String& name, const juce::String
     return result.isEmpty() ? fallback : result;
 }
 
-juce::File Library::fileForName (const juce::String& name) const
+juce::File Library::fileForName (const juce::String& name, const juce::String& category) const
 {
     const auto base = sanitiseName (name);
-    auto candidate = root.getChildFile (base).withFileExtension (fileExtension);
+    const auto directory = categoryDirectory (category);
+
+    if (const auto created = directory.createDirectory(); created.failed())
+        return {};
+
+    auto candidate = directory.getChildFile (base).withFileExtension (fileExtension);
     auto suffix = 2;
 
     while (candidate.exists())
     {
-        candidate = root.getChildFile (base + " " + juce::String (suffix))
-                        .withFileExtension (fileExtension);
+        candidate = directory.getChildFile (base + " " + juce::String (suffix))
+                          .withFileExtension (fileExtension);
         ++suffix;
     }
 
