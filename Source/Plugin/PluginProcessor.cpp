@@ -379,6 +379,31 @@ juce::Result KineticAudioProcessor::deletePreset (int index)
     return juce::Result::ok();
 }
 
+presets::Library::ImportSummary KineticAudioProcessor::importPresets (
+    const juce::Array<juce::File>& sources)
+{
+    const auto summary = presetLibrary.importFrom (sources);
+
+    updateProgramNames();
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    return summary;
+}
+
+juce::Result KineticAudioProcessor::exportPreset (int index, const juce::File& target) const
+{
+    const auto& entries = presetLibrary.entries();
+
+    if (! juce::isPositiveAndBelow (index, entries.size()))
+        return juce::Result::fail ("That preset is no longer in the folder.");
+
+    return presetLibrary.exportPreset (entries[index], target);
+}
+
+juce::Result KineticAudioProcessor::exportFolder (const juce::File& target) const
+{
+    return presetLibrary.exportArchive (target);
+}
+
 juce::Result KineticAudioProcessor::renamePreset (int index, const juce::String& newName)
 {
     const auto entries = presetLibrary.entries();

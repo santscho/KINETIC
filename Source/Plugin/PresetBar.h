@@ -50,7 +50,11 @@ private:
     void promptSaveAs();
     void saveAs (const juce::String& name);
     void confirmDelete();
+    void importPresets();
+    void exportCurrentPreset();
+    void exportFolder();
     void showError (const juce::String& message) const;
+    void showInfo (const juce::String& title, const juce::String& message) const;
 
     void adoptProgram (int program);
     void setDirty (bool shouldBeDirty);
@@ -68,6 +72,9 @@ private:
     juce::TextButton saveButton { "SAVE" }, saveAsButton { "SAVE AS" }, deleteButton { "DEL" };
 
     juce::Rectangle<int> labelArea;
+
+    // The choosers run asynchronously, so one has to stay alive until it calls back.
+    std::unique_ptr<juce::FileChooser> fileChooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetBar)
 };

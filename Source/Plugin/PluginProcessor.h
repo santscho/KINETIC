@@ -78,6 +78,13 @@ public:
     juce::Result deletePreset (int index);
     juce::Result renamePreset (int index, const juce::String& newName);
 
+    /** Imports preset documents and folder archives; a clashing name is kept alongside. */
+    presets::Library::ImportSummary importPresets (const juce::Array<juce::File>& sources);
+
+    /** Copies one preset, or the whole folder as an archive, to any location on disk. */
+    juce::Result exportPreset (int index, const juce::File& target) const;
+    juce::Result exportFolder (const juce::File& target) const;
+
     /** Re-reads the folder and tells the host the program list changed. */
     void refreshPresetList();
 

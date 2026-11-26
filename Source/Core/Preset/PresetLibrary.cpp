@@ -11,6 +11,13 @@ namespace
     constexpr const char* formatIdentifier = "kinetic.preset";
     constexpr int formatVersion = 1;
 
+    // A folder archive: one <KINETIC_PRESET> document per preset, under one element. It parses
+    // with the same per-preset reading a single file uses, which is what keeps exporting and
+    // importing free of a second pattern format.
+    constexpr const char* archiveTag = "KINETIC_PRESETS";
+    constexpr const char* archiveFormatIdentifier = "kinetic.presets";
+    constexpr int archiveFormatVersion = 1;
+
     /** The document a preset file holds: format, version, name, then the PATTERN element. */
     bool isPresetElement (const juce::XmlElement& xml) noexcept
     {
@@ -217,6 +224,142 @@ juce::Result Library::rename (const Entry& entry, const juce::String& newName,
 
     reload();
     return juce::Result::ok();
+}
+
+juce::Result Library::exportPreset (const Entry& entry, const juce::File& target) const
+{
+    if (entry.isFactory)
+        return juce::Result::fail ("The factory preset has no file to export.");
+
+    const auto xml = juce::XmlDocument::parse (entry.file);
+
+    if (xml == nullptr || ! isPresetElement (*xml))
+        return juce::Result::fail ("The preset could not be read.");
+
+    if (! xml->writeTo (target))
+        return juce::Result::fail ("The preset could not be written to " + target.getFullPathName());
+
+    return juce::Result::ok();
+}
+
+juce::Result Library::exportArchive (const juce::File& target, const juce::String& name) const
+{
+    juce::XmlElement archive (archiveTag);
+    archive.setAttribute ("format", archiveFormatIdentifier);
+    archive.setAttribute ("version", archiveFormatVersion);
+    archive.setAttribute ("name", name);
+
+    for (const auto& entry : list)
+    {
+        if (entry.isFactory)
+            continue;
+
+        if (auto xml = juce::XmlDocument::parse (entry.file))
+            if (isPresetElement (*xml))
+                archive.addChildElement (xml.release());
+    }
+
+    if (archive.getNumChildElements() == 0)
+        return juce::Result::fail ("The preset folder is empty, so there is nothing to export.");
+
+    if (! archive.writeTo (target))
+        return juce::Result::fail ("The archive could not be written to " + target.getFullPathName());
+
+    return juce::Result::ok();
+}
+
+Library::ImportSummary Library::importFrom (const juce::Array<juce::File>& sources)
+{
+    ImportSummary summary;
+
+    for (const auto& source : sources)
+    {
+        const auto xml = juce::XmlDocument::parse (source);
+
+        if (xml == nullptr)
+        {
+            summary.failures.add (source.getFileName() + ": not a readable document");
+            continue;
+        }
+
+        if (xml->hasTagName (archiveTag))
+        {
+            const auto archive = xml->getStringAttribute ("format") == archiveFormatIdentifier
+                                     && xml->getIntAttribute ("version", 0) == archiveFormatVersion;
+
+            if (! archive)
+            {
+                summary.failures.add (source.getFileName() + ": not a KINETIC preset folder");
+                continue;
+            }
+
+            for (const auto* child : xml->getChildIterator())
+            {
+                if (child == nullptr || ! child->hasTagName (rootTag))
+                    continue;
+
+                if (const auto result = importElement (*child); result.failed())
+                    summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
+                else
+                    ++summary.imported;
+            }
+
+            continue;
+        }
+
+        if (const auto result = importElement (*xml); result.failed())
+            summary.failures.add (source.getFileName() + ": " + result.getErrorMessage());
+        else
+            ++summary.imported;
+    }
+
+    return summary;
+}
+
+juce::Result Library::importElement (const juce::XmlElement& xml)
+{
+    if (! isPresetElement (xml))
+        return juce::Result::fail ("not a KINETIC preset");
+
+    Pattern pattern;
+    auto lane = 0;
+
+    if (! patternstate::readFromXml (xml, pattern, lane))
+        return juce::Result::fail ("its pattern is in a format this build does not read");
+
+    auto name = xml.getStringAttribute ("name").trim();
+
+    if (name.isEmpty())
+        name = "Imported";
+
+    // Keeping both rather than overwriting: importing a set twice must never lose a preset.
+    if (nameExists (name))
+        name = versionedName (name);
+
+    return save (pattern, lane, name, fileForName (name));
+}
+
+bool Library::nameExists (const juce::String& name) const
+{
+    for (const auto& entry : list)
+        if (! entry.isFactory && entry.name.equalsIgnoreCase (name))
+            return true;
+
+    return false;
+}
+
+juce::String Library::versionedName (const juce::String& name) const
+{
+    auto candidate = name + " version";
+    auto suffix = 2;
+
+    while (nameExists (candidate))
+    {
+        candidate = name + " version " + juce::String (suffix);
+        ++suffix;
+    }
+
+    return candidate;
 }
 
 juce::File Library::defaultDirectory()

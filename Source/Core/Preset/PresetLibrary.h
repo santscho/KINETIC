@@ -84,6 +84,29 @@ public:
     juce::Result rename (const Entry& entry, const juce::String& newName,
                          juce::File* renamedFile = nullptr);
 
+    /** Copies one preset document to `target`, which may be anywhere on disk. */
+    juce::Result exportPreset (const Entry& entry, const juce::File& target) const;
+
+    /** Writes every preset in the folder into a single archive document. */
+    juce::Result exportArchive (const juce::File& target,
+                                const juce::String& name = "KINETIC Presets") const;
+
+    /** What an import did, so the editor can report it. */
+    struct ImportSummary
+    {
+        int imported = 0;
+        juce::StringArray failures;         // one line per source that could not be imported
+    };
+
+    /**
+        Imports preset documents and folder archives, in any order.
+
+        A preset whose name is already in the folder is kept alongside the existing one under
+        "<name> version", "<name> version 2" and so on, so importing a set never overwrites
+        anything already there.
+    */
+    ImportSummary importFrom (const juce::Array<juce::File>& sources);
+
     /** `~/Library/Application Support/KINETIC/Presets`. */
     static juce::File defaultDirectory();
 
@@ -92,11 +115,18 @@ public:
                                       const juce::String& fallback = "Preset");
 
     static constexpr const char* fileExtension = "kineticpreset";
+    static constexpr const char* archiveExtension = "kineticset";
     static constexpr const char* factoryName = "FACTORY DEFAULT";
 
 private:
     juce::File fileForName (const juce::String& name) const;
     static juce::String readName (const juce::File& file);
+
+    /** Writes one preset document into this folder. Refuses a document it cannot read. */
+    juce::Result importElement (const juce::XmlElement& xml);
+
+    bool nameExists (const juce::String& name) const;
+    juce::String versionedName (const juce::String& name) const;
 
     juce::File root;
     juce::Array<Entry> list;

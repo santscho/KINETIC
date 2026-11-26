@@ -176,6 +176,8 @@ void PresetBar::showMenu()
 
     const auto entries = processor.getPresetEntries();
     const auto selected = currentIndexOrFactory();
+    const auto factorySelected = ! juce::isPositiveAndBelow (selected, entries.size())
+                                    || entries[selected].isFactory;
 
     juce::PopupMenu menu;
 
@@ -183,6 +185,9 @@ void PresetBar::showMenu()
         menu.addItem (i + 1, entries[i].name, true, i == selected);
 
     menu.addSeparator();
+    menu.addItem (1001, "Import presets...");
+    menu.addItem (1002, "Export this preset...", ! factorySelected);
+    menu.addItem (1003, "Export folder...");
     menu.addItem (1000, "Reveal folder in Finder");
 
     juce::Component::SafePointer<PresetBar> safeThis (this);
@@ -197,6 +202,24 @@ void PresetBar::showMenu()
                             if (result == 1000)
                             {
                                 safeThis->processor.getPresetFolder().revealToUser();
+                                return;
+                            }
+
+                            if (result == 1001)
+                            {
+                                safeThis->importPresets();
+                                return;
+                            }
+
+                            if (result == 1002)
+                            {
+                                safeThis->exportCurrentPreset();
+                                return;
+                            }
+
+                            if (result == 1003)
+                            {
+                                safeThis->exportFolder();
                                 return;
                             }
 
@@ -309,6 +332,121 @@ void PresetBar::confirmDelete()
                                     safeThis->refreshName();
                                     safeThis->repaint();
                                 }), true);
+}
+
+void PresetBar::importPresets()
+{
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Import presets",
+        processor.getPresetFolder().getParentDirectory(),
+        juce::String ("*.") + presets::Library::fileExtension + ";*."
+            + presets::Library::archiveExtension);
+
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode
+                                  | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::canSelectMultipleItems,
+                              [safeThis] (const juce::FileChooser& chooser)
+                              {
+                                  if (safeThis == nullptr)
+                                      return;
+
+                                  const auto files = chooser.getResults();
+
+                                  if (files.isEmpty())
+                                      return;
+
+                                  const auto summary = safeThis->processor.importPresets (files);
+                                  safeThis->reloadLibrary();
+
+                                  juce::String message;
+                                  message << "Imported " << summary.imported
+                                          << (summary.imported == 1 ? " preset." : " presets.");
+
+                                  if (! summary.failures.isEmpty())
+                                      message << "\n\nNot imported:\n"
+                                              << summary.failures.joinIntoString ("\n");
+
+                                  safeThis->showInfo ("Import presets", message);
+                              });
+}
+
+void PresetBar::exportCurrentPreset()
+{
+    const auto entries = processor.getPresetEntries();
+    const auto index = currentIndexOrFactory();
+
+    if (! juce::isPositiveAndBelow (index, entries.size()) || entries[index].isFactory)
+        return;
+
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Export preset",
+        juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
+            .getChildFile (entries[index].name)
+            .withFileExtension (presets::Library::fileExtension),
+        juce::String ("*.") + presets::Library::fileExtension);
+
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+    const auto presetIndex = index;
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [safeThis, presetIndex] (const juce::FileChooser& chooser)
+                              {
+                                  if (safeThis == nullptr)
+                                      return;
+
+                                  const auto target = chooser.getResult();
+
+                                  if (target == juce::File())
+                                      return;
+
+                                  if (const auto result = safeThis->processor.exportPreset (presetIndex,
+                                                                                            target);
+                                      result.failed())
+                                      safeThis->showError (result.getErrorMessage());
+                              });
+}
+
+void PresetBar::exportFolder()
+{
+    fileChooser = std::make_unique<juce::FileChooser> (
+        "Export preset folder",
+        juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
+            .getChildFile ("KINETIC Presets")
+            .withFileExtension (presets::Library::archiveExtension),
+        juce::String ("*.") + presets::Library::archiveExtension);
+
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [safeThis] (const juce::FileChooser& chooser)
+                              {
+                                  if (safeThis == nullptr)
+                                      return;
+
+                                  const auto target = chooser.getResult();
+
+                                  if (target == juce::File())
+                                      return;
+
+                                  if (const auto result = safeThis->processor.exportFolder (target);
+                                      result.failed())
+                                      safeThis->showError (result.getErrorMessage());
+                              });
+}
+
+void PresetBar::showInfo (const juce::String& title, const juce::String& message) const
+{
+    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                      .withIconType (juce::MessageBoxIconType::InfoIcon)
+                                      .withTitle (title)
+                                      .withMessage (message)
+                                      .withButton ("OK")
+                                      .withAssociatedComponent (const_cast<PresetBar*> (this)),
+                                  nullptr);
 }
 
 void PresetBar::showError (const juce::String& message) const

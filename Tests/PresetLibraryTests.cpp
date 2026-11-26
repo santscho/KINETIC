@@ -25,6 +25,7 @@ public:
         testIndexOfFileSurvivesASort();
         testStoredFileNameFallsBackToFactory();
         testFolderChangesArePickedUp();
+        testExportAndImport();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -231,6 +232,78 @@ private:
 
         expect (library.refreshIfChanged (0));
         expectEquals (library.entries().size(), 1);
+    }
+
+    void testExportAndImport()
+    {
+        beginTest ("A preset and a folder archive survive being exported and imported");
+
+        auto source = makeLibrary ("export-source");
+
+        juce::File bass, lead;
+        expect (source.save (makePattern(), 2, "Bass", {}, &bass).wasOk());
+
+        auto brighter = makePattern();
+        brighter.rootNote = 48;
+        expect (source.save (brighter, 1, "Lead", {}, &lead).wasOk());
+
+        // One preset on its own.
+        const auto single = temp.getChildFile ("Exported Bass.kineticpreset");
+        expect (source.exportPreset (source.entries()[1], single).wasOk());
+        expect (single.existsAsFile());
+
+        // The whole folder.
+        const auto archive = temp.getChildFile ("Set.kineticset");
+        expect (source.exportArchive (archive).wasOk());
+        expect (archive.existsAsFile());
+
+        auto destination = makeLibrary ("export-destination");
+
+        juce::Array<juce::File> files;
+        files.add (single);
+
+        auto summary = destination.importFrom (files);
+        expectEquals (summary.imported, 1);
+        expect (summary.failures.isEmpty());
+        expectEquals (destination.entries().size(), 2);
+        expectEquals (destination.entries()[1].name, juce::String ("Bass"));
+
+        // The pattern, the lane and the name all came through the file.
+        Pattern loaded;
+        int lane = 0;
+        expect (destination.load (destination.entries()[1], loaded, lane));
+        expectEquals (loaded.rootNote, 67);
+        expectEquals (loaded.beatsPerBar, 3);
+        expectEquals (lane, 2);
+
+        // The archive brings both presets, and the names already there are kept rather than
+        // overwritten.
+        files.clear();
+        files.add (archive);
+
+        summary = destination.importFrom (files);
+        expectEquals (summary.imported, 2);
+        expectEquals (destination.entries().size(), 4);
+
+        juce::StringArray names;
+        for (const auto& entry : destination.entries())
+            names.add (entry.name);
+
+        expect (names.contains ("Bass"));
+        expect (names.contains ("Bass version"));
+        expect (names.contains ("Lead"));
+
+        // A file that is not a preset is reported rather than imported.
+        const auto junk = temp.getChildFile ("junk.kineticpreset");
+        junk.replaceWithText ("<NOTES/>");
+
+        files.clear();
+        files.add (junk);
+
+        summary = destination.importFrom (files);
+        expectEquals (summary.imported, 0);
+        expectEquals (summary.failures.size(), 1);
+        expectEquals (destination.entries().size(), 4);
     }
 
     void testRename()
