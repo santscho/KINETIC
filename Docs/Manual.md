@@ -92,9 +92,9 @@ The window is resizable from 860×470 up to 1600×900 (default 1040×580).
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ KINETIC                                              [ VST3 ] │
+│ − + OCT 3    SCALE ON    KEY C ▾    MODE MAJOR ▾              │
 │ [1][2][3][4][5][6][7][8]                            [ ON ]     │
-│ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾ − + C1 ▾ OCT 3 │
-│ SCALE ON    KEY C ▾    MODE MAJOR ▾                           │
+│ Loop length [ 16 ] 1/16 ▾ STRAIGHT ▾ FORWARD ▾                │
 │  1   2   3   4   5   6   7   8   9  10 …                      │
 │ TRIG  █       █                                               │
 │ PITCH                                                         │
@@ -121,22 +121,25 @@ step position does not advance while it is off. Switching it back on while the t
 running joins at the current position and carries on from the step it stopped at; the steps that
 went by while it was off are skipped, not replayed.
 
-### 4.3 Lane controls
+### 4.3 Transpose, scale and lane controls
 
-None of the lane controls carry a text label; they are identified by position, left to right:
-the step-length number box, then the division, modifier and direction choosers. Their tooltips
-say the same as the table below.
+The row above the lane buttons holds the controls that apply to the whole pattern: `−` and `+`
+transpose the root note by octaves with the `OCT` readout beside them, then the scale aware switch
+with the key and mode it snaps to. The controls below the lane buttons apply to the lane being
+edited. None of them carry a text label; they are identified by position, left to right: the
+step-length number box, then the division, modifier and direction choosers. Their tooltips say the
+same as the table below.
 
 | Control | Range | Meaning |
 | --- | --- | --- |
+| Transpose (`−` `+`, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. `+` and `−` move it one octave up or down and `OCT` shows the octave it lands in (`OCT 3` is C3); they never change its note letter. |
+| Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and mode beside it. |
+| Key | `C` … `B` | Key of the scale. |
+| Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
 | Length (leftmost number box with +/−) | 1–64 | The lane's loop length. The grid always shows at least 16 columns; columns past the loop length are dimmed and are not played. |
 | Division | `1/1`, `1/2`, `1/4`, `1/8`, `1/16`, `1/32`, `1/64` | Duration of one step. `1/16` is a sixteenth note, `1/4` a quarter. |
 | Modifier | `STRAIGHT`, `DOTTED`, `TRIPLET` | Multiplies the step duration by 1, 1.5 or 2/3. |
 | Direction | `FORWARD`, `REVERSE`, `PING-PONG`, `PENDULUM`, `RANDOM WALK` | Play order, applied to all four sub-lanes of the lane. |
-| Root note (`−` `+`, the note list, `OCT`) | 0–127, default 60 | The pattern's root note, shared by all eight lanes. The list names notes from `C1` to `B1`; with scale aware on it only offers the notes of the scale, and a root outside it leaves the list unselected. `+` and `−` move the note one octave up or down, and the `OCT` readout shows the octave of the current note (`C1` with `OCT 3` is C3). |
-| Scale aware (`SCALE ON` / `SCALE OFF`) | on / off, default off | Snaps every generated note to the key and scale beside it. |
-| Key | `C` … `B` | Key of the scale. |
-| Mode | `CHROMATIC`, `MAJOR`, `MINOR`, `DORIAN`, `PHRYGIAN DOM`, `PENTATONIC` | Scale the notes are snapped to; `CHROMATIC` allows all twelve pitch classes and so changes nothing. |
 
 Step duration in quarter notes is `4 × numerator / denominator`, scaled by the modifier:
 `1/16` = 0.25, `1/4` = 1.0, `1/64` = 0.0625.
@@ -245,24 +248,23 @@ through the state format — but the editor has no controls for them in 0.5.0.
 ### 6.2 MIDI channel and root note
 
 The MIDI channel is per lane, 1–16 (default 1), and still state-format only. The root note is one
-note for the whole pattern, 0–127 (default 60, i.e. C3 in Live/JUCE naming): it is picked from the
-editor's `C1`–`B1` note list and transposed by its `−`/`+` octave buttons (§4.3), and the painted
-pitch of every lane is an offset from it, so one transpose moves all eight lanes together.
+note for the whole pattern, 0–127 (default 60, i.e. C3 in Live/JUCE naming): the editor's `−`/`+`
+buttons transpose it by octaves (§4.3), and the painted pitch of every lane is an offset from it,
+so one transpose moves all eight lanes together.
 
 ### 6.3 Scales
 
-Scale aware is the switch in the editor's second control row. With it on, every generated note is
-snapped to the chosen key and mode **when the step fires**; with it off, which is the default, the
-painted pitch is played exactly. A note that is already sounding is never retuned, so changing the
+Scale aware is the switch in the editor's row above the lane buttons. With it on, every generated
+note is snapped to the chosen key and mode **when the step fires**; with it off, which is the
+default, the painted pitch is played exactly. A note that is already sounding is never retuned, so changing the
 key, the mode or the switch cannot make a held note jump — the change takes effect with the next
 trigger.
 
 The modes are `chromatic`, `major`, `minor`, `dorian`, `phrygianDominant` and `pentatonic`; the
 state format also carries `custom` with a 12-bit mask (C = bit 0, default `0x0fff`) that no editor
 control sets yet. The key is one of the twelve pitch classes. Key, mode and switch are pattern-wide
-and apply to all eight lanes, and the root note list only offers the pitch classes the chosen key
-and mode allow. Quantisation picks the nearest allowed pitch class and resolves ties upward, so
-`F#` in C major becomes `G`.
+and apply to all eight lanes. Quantisation picks the nearest allowed pitch class and resolves ties
+upward, so `F#` in C major becomes `G`.
 
 ### 6.4 Sub-lane loop lengths
 
