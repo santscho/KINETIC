@@ -22,6 +22,7 @@ public:
         testForeignFilesAreIgnored();
         testFactoryReset();
         testDelete();
+        testIndexOfFileSurvivesASort();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -146,6 +147,33 @@ private:
         expect (library.remove (library.entries()[1]).wasOk());
         expect (! saved.existsAsFile());
         expectEquals (library.entries().size(), 1);
+    }
+
+    void testIndexOfFileSurvivesASort()
+    {
+        beginTest ("A preset is found again by its file after the list re-sorts");
+
+        auto library = makeLibrary ("remap");
+
+        juce::File alpha, zulu;
+        expect (library.save (makePattern(), 0, "Alpha", {}, &alpha).wasOk());
+        expect (library.save (makePattern(), 0, "Zulu", {}, &zulu).wasOk());
+
+        // Factory, Alpha, Zulu: the current program would be 2.
+        expectEquals (library.indexOfFile (alpha), 1);
+        expectEquals (library.indexOfFile (zulu), 2);
+
+        // Deleting Alpha re-sorts everything after it one place to the left, so holding the old
+        // number 2 would now name a preset that no longer exists.
+        expect (library.remove (library.entries()[1]).wasOk());
+        expectEquals (library.entries().size(), 2);
+        expectEquals (library.entries()[1].name, juce::String ("Zulu"));
+        expectEquals (library.indexOfFile (zulu), 1);
+
+        // The deleted file is gone, which is what sends a deleted current program to the factory
+        // entry, and the factory entry itself is always entry 0.
+        expectEquals (library.indexOfFile (alpha), -1);
+        expectEquals (library.indexOfFile (juce::File()), 0);
     }
 
     void testRename()

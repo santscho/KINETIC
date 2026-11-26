@@ -63,6 +63,18 @@ void Library::reload()
     });
 }
 
+int Library::indexOfFile (const juce::File& file) const
+{
+    if (file == juce::File())
+        return 0;
+
+    for (int i = 0; i < list.size(); ++i)
+        if (list[i].file == file)
+            return i;
+
+    return -1;
+}
+
 juce::String Library::readName (const juce::File& file)
 {
     const auto xml = juce::XmlDocument::parse (file);

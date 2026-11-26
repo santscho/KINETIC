@@ -229,16 +229,11 @@ void KineticAudioProcessor::updateProgramNames()
 
 int KineticAudioProcessor::programIndexForFile (const juce::File& file) const
 {
-    if (file == juce::File())
-        return 0;
+    // Entry numbers move when the folder changes; the file does not. A file that is gone - the
+    // current preset was just deleted - falls back to the factory entry.
+    const auto index = presetLibrary.indexOfFile (file);
 
-    const auto& entries = presetLibrary.entries();
-
-    for (int i = 0; i < entries.size(); ++i)
-        if (entries[i].file == file)
-            return i;
-
-    return 0;
+    return index >= 0 ? index : 0;
 }
 
 void KineticAudioProcessor::refreshPresetList()
@@ -324,16 +319,20 @@ juce::Result KineticAudioProcessor::deletePreset (int index)
     if (! juce::isPositiveAndBelow (index, entries.size()))
         return juce::Result::fail ("That preset is no longer in the folder.");
 
-    const auto wasCurrent = index == currentProgram.load (std::memory_order_relaxed);
+        // Remember which file was current before the list re-sorts, so deleting a preset anywhere
+    // else cannot leave the current program pointing at a different one.
+    const auto current = currentProgram.load (std::memory_order_relaxed);
+    const auto currentFile = juce::isPositiveAndBelow (current, entries.size())
+                                 ? entries[current].file
+                                 : juce::File();
 
-    if (const auto result = presetLibrary.remove (entries[index]);
-        result.failed())
+    if (const auto result = presetLibrary.remove (entries[index]); result.failed())
         return result;
 
-    if (wasCurrent)
-        currentProgram.store (0, std::memory_order_relaxed);
-
     updateProgramNames();
+
+    // Deleting the current program leaves no file to follow, which is the factory entry.
+    currentProgram.store (programIndexForFile (currentFile), std::memory_order_relaxed);
     updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
     return juce::Result::ok();
 }
