@@ -159,7 +159,13 @@ public:
     juce::Result renameCategory (const juce::String& from, const juce::String& to,
                                  juce::String* renamedTo = nullptr);
 
-    /** Deletes a category, which has to be empty. The default category cannot be deleted. */
+    /**
+        Deletes a category folder.
+
+        The folder has to be one this library created for presets: no preset in it, and nothing
+        else in it either, so deleting a category can never take a file that is not a preset
+        with it. The default category is the library root and cannot be deleted.
+    */
     juce::Result deleteCategory (const juce::String& category);
 
     bool isCategoryEmpty (const juce::String& category) const;

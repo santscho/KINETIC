@@ -26,6 +26,33 @@ namespace
                 && xml.getStringAttribute ("format") == formatIdentifier
                 && xml.getIntAttribute ("version", 0) == formatVersion;
     }
+
+    /**
+        The first thing in a category folder that a preset is not, described for a message.
+
+        Deleting a category removes its folder, so the folder may only hold presets: a note, a
+        rendering or a subfolder somebody left there keeps it, and the message names it.
+    */
+    juce::String foreignItemIn (const juce::File& folder)
+    {
+        for (const auto& child : folder.findChildFiles (juce::File::findFilesAndDirectories, false))
+        {
+            if (child.isDirectory())
+                return "\"" + child.getFileName() + "\", which is a folder";
+
+            if (! child.hasFileExtension (Library::fileExtension))
+                return "\"" + child.getFileName() + "\"";
+
+            const auto xml = juce::XmlDocument::parse (child);
+
+            // A file that claims the preset extension but does not read as one is not a preset
+            // either, so it is treated the same way: the folder stays.
+            if (xml == nullptr || ! isPresetElement (*xml))
+                return "\"" + child.getFileName() + "\"";
+        }
+
+        return {};
+    }
 }
 
 Library::Library (juce::File rootDirectory)
@@ -281,6 +308,11 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
     for (const auto& file : originals)
         file.deleteFile();
 
+    // A category with no presets in it is still a category, so renaming it leaves the new folder
+    // in place even though nothing was written into it.
+    if (pending.empty())
+        categoryDirectory (target).createDirectory();
+
     // The old folder goes when nothing is left in it; a folder holding unrelated files stays, so
     // renaming a category never deletes anything that is not a preset.
     if (source != defaultCategoryName)
@@ -311,6 +343,14 @@ juce::Result Library::deleteCategory (const juce::String& category)
     if (! isCategoryEmpty (category))
         return juce::Result::fail ("Only an empty category can be deleted. Move or delete its "
                                    "presets first.");
+
+    // The empty check above only looks at presets; anything else in the folder would be deleted
+    // with it, so the folder is left alone and the reason names what is in the way.
+    if (const auto foreign = foreignItemIn (folder); foreign.isNotEmpty())
+        return juce::Result::fail ("The folder of \"" + category + "\" still holds " + foreign
+                                   + ", which is not a preset. Only a folder that holds nothing "
+                                     "but presets can be deleted. Move it elsewhere in Finder "
+                                     "first.");
 
     if (! folder.deleteRecursively() && folder.isDirectory())
         return juce::Result::fail ("The category folder could not be deleted.");
