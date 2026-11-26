@@ -60,6 +60,10 @@ public:
 
     juce::Result remove (const Entry& entry);
 
+    /** Renames a preset: the document's name and its file name move together. */
+    juce::Result rename (const Entry& entry, const juce::String& newName,
+                         juce::File* renamedFile = nullptr);
+
     /** `~/Library/Application Support/KINETIC/Presets`. */
     static juce::File defaultDirectory();
 

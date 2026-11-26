@@ -1,12 +1,10 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-#include "Core/Preset/PresetLibrary.h"
-#include "Core/Sequencer/SharedPattern.h"
+#include "PluginProcessor.h"
 
 namespace kinetic
 {
@@ -15,12 +13,13 @@ namespace kinetic
     The preset browser in the editor header.
 
     The name button opens the list of every preset in ~/Library/Application Support/KINETIC/Presets
-    with the factory reset at the top; the arrows step through the same list and wrap. Loading a
-    preset writes it into the editor's pattern and publishes it like any other edit, so the audio
-    thread picks it up at its next block.
+    with the factory reset at the top; the arrows step through the same list and wrap.
 
-    Save, save as and delete work on files only. The host session still stores the pattern as it
-    always did, so a preset is a starting point rather than something the session depends on.
+    The bar holds no state of its own beyond which program it is showing: loading, saving,
+    renaming and deleting all go through the processor, which owns the library and the program
+    index the host sees. That is what keeps the header, the host's program list and the pattern
+    in the session from drifting apart - a program the host selects is picked up here on the next
+    timer tick, and a preset saved here becomes the current program.
 
     A `*` after the name means the pattern has been edited since it was loaded or saved; it is
     driven by SharedPattern's publish counter, so every edit - from this bar, the grid or the
@@ -29,22 +28,19 @@ namespace kinetic
 class PresetBar final : public juce::Component
 {
 public:
-    PresetBar (SharedPattern& sharedPattern, std::atomic<int>& selectedLane);
+    explicit PresetBar (KineticAudioProcessor& processor);
 
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    /** Called after a preset has been applied and published, so the editor can re-read it. */
+    /** Called after a preset has been applied, so the editor can re-read the pattern at once. */
     std::function<void()> onPresetLoaded;
 
-    /** Re-reads the preset folder, keeping the current preset when its file still exists. */
+    /** Re-reads the preset folder and follows whatever program the processor now has. */
     void reloadLibrary();
 
-    /** Shows the modified marker once the pattern has been published since it was loaded. */
+    /** Follows a program the host selected, and shows the modified marker after an edit. */
     void refreshDirtyState();
-
-    /** Marks the current preset modified, for changes made outside this bar (a host state load). */
-    void markModified();
 
 private:
     void applyEntry (int index);
@@ -56,14 +52,12 @@ private:
     void confirmDelete();
     void showError (const juce::String& message) const;
 
+    void adoptProgram (int program);
     void setDirty (bool shouldBeDirty);
     void refreshName();
     int currentIndexOrFactory() const;
-    int indexOfFile (const juce::File& file) const;
 
-    SharedPattern& shared;
-    std::atomic<int>& selectedLane;
-    presets::Library library;
+    KineticAudioProcessor& processor;
 
     int currentIndex = 0;
     juce::uint32 savedRevision = 0;
