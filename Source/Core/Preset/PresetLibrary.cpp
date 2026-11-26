@@ -262,6 +262,14 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
     if (target.isEmpty())
         return juce::Result::fail ("A category must have a name.");
 
+    // The default category is the preset folder itself, the one the categories live in: renaming
+    // it would mean renaming the library, and the folder it holds is not a category but the hold
+    // they sit in. Deleting refuses it for the same reason.
+    if (source == defaultCategoryName)
+        return juce::Result::fail ("The default category is the preset folder that holds the "
+                                   "other categories, so it cannot be renamed. Save or move the "
+                                   "preset into a category and rename that instead.");
+
     if (target == source)
     {
         if (renamedTo != nullptr)
@@ -270,8 +278,7 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
         return juce::Result::ok();
     }
 
-    // The default category is the library root, which always exists.
-    if (source != defaultCategoryName && ! categoryDirectory (source).isDirectory())
+    if (! categoryDirectory (source).isDirectory())
         return juce::Result::fail ("\"" + source + "\" is not a category.");
 
     // Renaming onto a folder that is already there would merge two categories, which is not what
@@ -340,13 +347,10 @@ juce::Result Library::renameCategory (const juce::String& from, const juce::Stri
 
     // The presets were the folder's only contents, so it is empty now. The emptiness check stays
     // as a guard: nothing here may remove a file that is not one of ours.
-    if (source != defaultCategoryName)
-    {
-        const auto folder = categoryDirectory (source);
+    const auto folder = categoryDirectory (source);
 
-        if (folder.getNumberOfChildFiles (juce::File::findFilesAndDirectories) == 0)
-            folder.deleteRecursively();
-    }
+    if (folder.getNumberOfChildFiles (juce::File::findFilesAndDirectories) == 0)
+        folder.deleteRecursively();
 
     if (renamedTo != nullptr)
         *renamedTo = target;

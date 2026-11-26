@@ -561,8 +561,17 @@ private:
         expect (library.deleteCategory ("Pad").wasOk());
         expect (! library.categories().contains ("Pad"));
 
-        // The default category is the library root and stays.
+        // The default category is the library root and stays, and it cannot be renamed either: the
+        // folders inside it are the categories, not files in the way.
         expect (library.deleteCategory (presets::Library::defaultCategoryName).failed());
+
+        const auto refusedDefault = library.renameCategory (presets::Library::defaultCategoryName,
+                                                            "Home");
+        expect (refusedDefault.failed());
+        expect (refusedDefault.getErrorMessage().contains ("cannot be renamed"));
+        expect (library.categories().contains (presets::Library::defaultCategoryName));
+        expect (! library.categories().contains ("Home"));
+        expect (! library.directory().getChildFile ("Home").isDirectory());
 
         // A folder holding anything that is not a preset is refused, and the message names it,
         // because deleting the category would take that file with it.

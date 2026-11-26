@@ -275,7 +275,9 @@ its file name, so nothing that refers to it has to change — a project that was
 rename still opens on its preset, found by that file name. A name already in use is refused
 rather than merging two folders, and a folder that holds anything besides presets — a note, a
 rendering, a subfolder — is refused as well, since moving a category is not a reason to move
-files the plug-in did not write. `Delete empty category…` lists the categories that hold no
+files the plug-in did not write. The default category is the preset folder that holds the other
+categories, so `Rename category…` does not list it and renaming it is refused.
+`Delete empty category…` lists the categories that hold no
 preset and removes the folder after asking; a category with presets in it has to be emptied with
 `Move to…` or `DEL` first, and the default category cannot be deleted. Deleting applies the same
 rule as renaming: a folder holding anything besides presets is refused, the message names the
