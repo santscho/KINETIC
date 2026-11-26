@@ -1,6 +1,7 @@
 #include "PresetLibrary.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace kinetic::presets
 {
@@ -193,6 +194,126 @@ juce::Result Library::createCategory (const juce::String& name)
     if (const auto created = categoryDirectory (cleanName).createDirectory(); created.failed())
         return juce::Result::fail ("The category folder could not be created: "
                                    + created.getErrorMessage());
+
+    reload();
+    return juce::Result::ok();
+}
+
+bool Library::isCategoryEmpty (const juce::String& category) const
+{
+    for (const auto& entry : list)
+        if (! entry.isFactory && entry.category == category)
+            return false;
+
+    return true;
+}
+
+juce::Result Library::renameCategory (const juce::String& from, const juce::String& to,
+                                      juce::String* renamedTo)
+{
+    const auto source = from.isEmpty() ? juce::String (defaultCategoryName) : from;
+    const auto target = sanitiseName (to, "");
+
+    if (target.isEmpty())
+        return juce::Result::fail ("A category must have a name.");
+
+    if (target == source)
+    {
+        if (renamedTo != nullptr)
+            *renamedTo = target;
+
+        return juce::Result::ok();
+    }
+
+    // The default category is the library root, which always exists.
+    if (source != defaultCategoryName && ! categoryDirectory (source).isDirectory())
+        return juce::Result::fail ("\"" + source + "\" is not a category.");
+
+    // Renaming onto a folder that is already there would merge two categories, which is not what
+    // renaming means; importing is how presets of two folders are brought together.
+    if (categoryDirectory (target).isDirectory())
+        return juce::Result::fail ("\"" + target + "\" already exists.");
+
+    // Every preset is read before anything is written, so a file that cannot be read fails the
+    // rename with the folder still as it was.
+    struct Pending
+    {
+        Pattern pattern;
+        int lane = 0;
+        juce::String name;
+        juce::File file;
+    };
+
+    std::vector<Pending> pending;
+
+    for (const auto& entry : list)
+    {
+        if (entry.isFactory || entry.category != source)
+            continue;
+
+        const auto xml = juce::XmlDocument::parse (entry.file);
+
+        if (xml == nullptr || ! isPresetElement (*xml))
+            return juce::Result::fail ("\"" + entry.name + "\" could not be read.");
+
+        Pending item;
+        item.name = entry.name;
+        item.file = entry.file;
+
+        if (! patternstate::readFromXml (*xml, item.pattern, item.lane))
+            return juce::Result::fail ("\"" + entry.name + "\" is in a format this build does not"
+                                                                " read.");
+
+        pending.push_back (std::move (item));
+    }
+
+    std::vector<juce::File> originals;
+
+    for (const auto& item : pending)
+    {
+        if (const auto result = save (item.pattern, item.lane, item.name, {}, nullptr, target);
+            result.failed())
+            return result;
+
+        originals.push_back (item.file);
+    }
+
+    for (const auto& file : originals)
+        file.deleteFile();
+
+    // The old folder goes when nothing is left in it; a folder holding unrelated files stays, so
+    // renaming a category never deletes anything that is not a preset.
+    if (source != defaultCategoryName)
+    {
+        const auto folder = categoryDirectory (source);
+
+        if (folder.getNumberOfChildFiles (juce::File::findFilesAndDirectories) == 0)
+            folder.deleteRecursively();
+    }
+
+    if (renamedTo != nullptr)
+        *renamedTo = target;
+
+    reload();
+    return juce::Result::ok();
+}
+
+juce::Result Library::deleteCategory (const juce::String& category)
+{
+    if (category.isEmpty() || category == defaultCategoryName)
+        return juce::Result::fail ("The default category cannot be deleted.");
+
+    const auto folder = categoryDirectory (category);
+
+    if (! folder.isDirectory())
+        return juce::Result::fail ("\"" + category + "\" is not a category.");
+
+    if (! isCategoryEmpty (category))
+        return juce::Result::fail ("Only an empty category can be deleted. Move or delete its "
+                                   "presets first.");
+
+    if (! folder.deleteRecursively() && folder.isDirectory())
+        return juce::Result::fail ("The category folder could not be deleted.");
 
     reload();
     return juce::Result::ok();

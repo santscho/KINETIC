@@ -239,13 +239,36 @@ void PresetBar::showMenu()
     menu.addItem (1002, "Export this preset...", ! factorySelected);
     menu.addSubMenu ("Export category...", exportMenu);
     menu.addItem (1004, "New category...");
+
+    juce::PopupMenu renameMenu;
+
+    for (int i = 0; i < categories.size(); ++i)
+        renameMenu.addItem (4001 + i, categories[i]);
+
+    menu.addSubMenu ("Rename category...", renameMenu);
+
+    // Only empty categories can be deleted, so the submenu lists exactly those and is disabled
+    // while every category still holds a preset.
+    juce::StringArray emptyCategories;
+
+    for (const auto& category : categories)
+        if (category != presets::Library::defaultCategoryName
+             && processor.isCategoryEmpty (category))
+            emptyCategories.add (category);
+
+    juce::PopupMenu deleteMenu;
+
+    for (int i = 0; i < emptyCategories.size(); ++i)
+        deleteMenu.addItem (5001 + i, emptyCategories[i]);
+
+    menu.addSubMenu ("Delete empty category...", deleteMenu, ! emptyCategories.isEmpty());
     menu.addItem (1000, "Reveal folder in Finder");
 
     juce::Component::SafePointer<PresetBar> safeThis (this);
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&nameButton)
                             .withParentComponent (getTopLevelComponent()),
-                        [safeThis, categories] (int result)
+                        [safeThis, categories, emptyCategories] (int result)
                         {
                             if (safeThis == nullptr || result <= 0)
                                 return;
@@ -280,6 +303,18 @@ void PresetBar::showMenu()
                             if (result >= 3001 && result <= 3000 + categories.size())
                             {
                                 safeThis->moveToCategory (categories[result - 3001]);
+                                return;
+                            }
+
+                            if (result >= 4001 && result <= 4000 + categories.size())
+                            {
+                                safeThis->promptRenameCategory (categories[result - 4001]);
+                                return;
+                            }
+
+                            if (result >= 5001 && result <= 5000 + emptyCategories.size())
+                            {
+                                safeThis->confirmDeleteCategory (emptyCategories[result - 5001]);
                                 return;
                             }
 
@@ -389,6 +424,67 @@ void PresetBar::promptNewCategory()
                                         created.failed())
                                     {
                                         safeThis->showError (created.getErrorMessage());
+                                        return;
+                                    }
+
+                                    safeThis->reloadLibrary();
+                                }), true);
+}
+
+void PresetBar::promptRenameCategory (const juce::String& category)
+{
+    auto* alert = new juce::AlertWindow ("Rename category",
+                                         "New name for \"" + category + "\". Its presets keep their "
+                                             "names, so projects that use them are unaffected.",
+                                         juce::MessageBoxIconType::NoIcon);
+    alert->addTextEditor ("name", category, "Name");
+    alert->addButton ("Rename", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    alert->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    juce::Component::SafePointer<juce::AlertWindow> alertRef (alert);
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+
+    alert->enterModalState (true, juce::ModalCallbackFunction::create (
+                                [safeThis, alertRef, category] (int result)
+                                {
+                                    if (safeThis == nullptr || alertRef == nullptr || result != 1)
+                                        return;
+
+                                    if (const auto renamed = safeThis->processor.renameCategory (
+                                            category, alertRef->getTextEditorContents ("name"));
+                                        renamed.failed())
+                                    {
+                                        safeThis->showError (renamed.getErrorMessage());
+                                        return;
+                                    }
+
+                                    safeThis->reloadLibrary();
+                                }), true);
+}
+
+void PresetBar::confirmDeleteCategory (const juce::String& category)
+{
+    auto* alert = new juce::AlertWindow ("Delete category",
+                                         "Delete the empty category \"" + category
+                                             + "\"? The folder is removed from disk.",
+                                         juce::MessageBoxIconType::WarningIcon);
+    alert->addButton ("Delete", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    alert->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+
+    juce::Component::SafePointer<juce::AlertWindow> alertRef (alert);
+    juce::Component::SafePointer<PresetBar> safeThis (this);
+
+    alert->enterModalState (true, juce::ModalCallbackFunction::create (
+                                [safeThis, alertRef, category] (int result)
+                                {
+                                    if (safeThis == nullptr || alertRef == nullptr || result != 1)
+                                        return;
+
+                                    if (const auto removed = safeThis->processor.deleteCategory (
+                                            category);
+                                        removed.failed())
+                                    {
+                                        safeThis->showError (removed.getErrorMessage());
                                         return;
                                     }
 

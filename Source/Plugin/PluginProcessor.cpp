@@ -334,6 +334,54 @@ juce::Result KineticAudioProcessor::createCategory (const juce::String& name)
     return juce::Result::ok();
 }
 
+juce::Result KineticAudioProcessor::renameCategory (const juce::String& from,
+                                                  const juce::String& to)
+{
+    const auto entries = presetLibrary.entries();
+    const auto current = currentProgram.load (std::memory_order_relaxed);
+    const auto currentEntry = juce::isPositiveAndBelow (current, entries.size())
+                                  ? entries[current]
+                                  : presets::Entry {};
+
+    juce::String renamedTo;
+
+    if (const auto result = presetLibrary.renameCategory (from, to, &renamedTo); result.failed())
+        return result;
+
+    updateProgramNames();
+
+    // Presets keep their file names across a category rename, so the current program is found
+    // again by that name - in the renamed folder when it lived there, and where it was otherwise.
+    // It is always looked up again, because the list re-sorts around the category's new name.
+    const auto storedName = currentEntry.file.getFileName();
+    const auto category = currentEntry.category == from ? renamedTo : currentEntry.category;
+
+    currentProgram.store (storedName.isEmpty()
+                              ? 0
+                              : presetLibrary.indexForFileName (storedName, category),
+                          std::memory_order_relaxed);
+
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    return juce::Result::ok();
+}
+
+juce::Result KineticAudioProcessor::deleteCategory (const juce::String& category)
+{
+    const auto entries = presetLibrary.entries();
+    const auto current = currentProgram.load (std::memory_order_relaxed);
+    const auto currentFile = juce::isPositiveAndBelow (current, entries.size())
+                                 ? entries[current].file
+                                 : juce::File();
+
+    if (const auto result = presetLibrary.deleteCategory (category); result.failed())
+        return result;
+
+    updateProgramNames();
+    currentProgram.store (programIndexForFile (currentFile), std::memory_order_relaxed);
+    updateHostDisplay (juce::AudioProcessorListener::ChangeDetails().withProgramChanged (true));
+    return juce::Result::ok();
+}
+
 juce::Result KineticAudioProcessor::savePreset (const juce::String& name, int replacing,
                                                 const juce::String& category, int* savedProgram)
 {

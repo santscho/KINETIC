@@ -150,6 +150,20 @@ public:
     /** Creates an empty category, so presets can be saved into it. */
     juce::Result createCategory (const juce::String& name);
 
+    /**
+        Renames a category: every preset in it moves to the new folder under the same file name.
+
+        Refuses a name that is already in use rather than merging two folders, which is what
+        importing is for. `renamedTo` receives the name the category now has.
+    */
+    juce::Result renameCategory (const juce::String& from, const juce::String& to,
+                                 juce::String* renamedTo = nullptr);
+
+    /** Deletes a category, which has to be empty. The default category cannot be deleted. */
+    juce::Result deleteCategory (const juce::String& category);
+
+    bool isCategoryEmpty (const juce::String& category) const;
+
     /** `~/Library/Application Support/KINETIC/Presets`. */
     static juce::File defaultDirectory();
 
