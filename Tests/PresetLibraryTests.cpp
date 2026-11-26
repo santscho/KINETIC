@@ -22,6 +22,7 @@ public:
         testForeignFilesAreIgnored();
         testFactoryReset();
         testDelete();
+        testRename();
         testEmptyNameIsRefused();
     }
 
@@ -145,6 +146,31 @@ private:
         expect (library.remove (library.entries()[1]).wasOk());
         expect (! saved.existsAsFile());
         expectEquals (library.entries().size(), 1);
+    }
+
+    void testRename()
+    {
+        beginTest ("Renaming moves the document name and the file together");
+
+        auto library = makeLibrary ("rename");
+
+        juce::File first;
+        expect (library.save (makePattern(), 3, "Old Name", {}, &first).wasOk());
+
+        juce::File renamed;
+        expect (library.rename (library.entries()[1], "New Name", &renamed).wasOk());
+
+        expect (! first.existsAsFile());
+        expect (renamed.existsAsFile());
+        expectEquals (library.entries().size(), 2);
+        expectEquals (library.entries()[1].name, juce::String ("New Name"));
+
+        Pattern loaded;
+        int lane = 0;
+
+        expect (library.load (library.entries()[1], loaded, lane));
+        expectEquals (loaded.rootNote, 67);
+        expectEquals (lane, 3);
     }
 
     void testEmptyNameIsRefused()

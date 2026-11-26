@@ -228,6 +228,13 @@ The header carries the preset browser: `PRESET` `‹` `›` `name` `SAVE` `SAVE 
 - The `FACTORY DEFAULT` entry is built in and cannot be saved over or deleted. Loading it restores
   the default pattern with lane 1 playing, which is what a fresh instance starts with.
 
+The same folder is the plug-in's **program list**: the host's preset or program menu shows
+`FACTORY DEFAULT` and every preset, in the order the header uses. Choosing a program there loads
+it exactly like choosing it in the header, and the header follows a program the host recalls.
+Saving, renaming or deleting a preset refreshes the host's list, and a host's rename renames the
+file too. Hosts built on a project that only allows one program still see the single-program case
+with no presets saved.
+
 Presets are plain XML files, one per preset, in `~/Library/Application Support/KINETIC/Presets`,
 with the extension `.kineticpreset`. A preset holds the same document the host keeps in its
 session, wrapped in a `KINETIC_PRESET` element that carries the format, its version and the name,
@@ -385,7 +392,8 @@ inside the host's session via the plug-in state. Notes:
   the pattern matters, save the host set.
 - Presets are separate files and are not part of the session: the session always holds the
   pattern itself, so a session still opens if the preset it started from was deleted or moved
-  (§4.6).
+  (§4.6). The host's program selection is not stored either — the pattern is what a reopened
+  session plays, whatever the preset folder looks like by then.
 
 ---
 

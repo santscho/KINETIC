@@ -8,7 +8,7 @@ namespace kinetic
 KineticAudioProcessorEditor::KineticAudioProcessorEditor (KineticAudioProcessor& p)
     : juce::AudioProcessorEditor (&p), audioProcessor (p),
       patternEditor (p.getSharedPattern(), p.getSelectedLane()),
-      presetBar (p.getSharedPattern(), p.getSelectedLane())
+      presetBar (p)
 {
     setOpaque (true);
     setResizable (true, true);
@@ -126,9 +126,9 @@ void KineticAudioProcessorEditor::timerCallback()
     {
         lastPatternRevision = revision;
         patternEditor.refreshAll();
-        presetBar.markModified();      // the host replaced the pattern, so no preset matches it
     }
 
+    // Follows a program the host recalled, and marks the preset modified after any edit.
     presetBar.refreshDirtyState();
     repaint (0, getHeight() - 62, getWidth(), 62);
 }

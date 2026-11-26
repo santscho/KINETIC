@@ -14,8 +14,8 @@ namespace
     }
 }
 
-PresetBar::PresetBar (SharedPattern& sharedPattern, std::atomic<int>& selectedLaneRef)
-    : shared (sharedPattern), selectedLane (selectedLaneRef)
+PresetBar::PresetBar (KineticAudioProcessor& processorRef)
+    : processor (processorRef)
 {
     previousButton.setTooltip ("Previous preset");
     nextButton.setTooltip ("Next preset");
@@ -41,9 +41,14 @@ PresetBar::PresetBar (SharedPattern& sharedPattern, std::atomic<int>& selectedLa
     saveAsButton.onClick = [this] { promptSaveAs(); };
     deleteButton.onClick = [this] { confirmDelete(); };
 
+    // The folder may have gained or lost files while no editor was open, and the host's program
+    // list is built from it: opening the editor is the moment to bring both up to date.
+    processor.refreshPresetList();
+
     // Whatever the session already holds counts as the starting point, so opening the editor on a
     // pattern the host restored does not immediately look unsaved.
-    savedRevision = shared.revision();
+    savedRevision = processor.getSharedPattern().revision();
+    currentIndex = processor.getCurrentProgram();
     refreshName();
 }
 
@@ -77,23 +82,35 @@ void PresetBar::resized()
 
 void PresetBar::reloadLibrary()
 {
-    const auto kept = library.entries()[currentIndexOrFactory()].file;
-
-    library.reload();
-    currentIndex = indexOfFile (kept);
+    processor.refreshPresetList();
+    currentIndex = processor.getCurrentProgram();
     refreshName();
     repaint();
 }
 
 void PresetBar::refreshDirtyState()
 {
-    if (shared.revision() != savedRevision)
+    const auto program = processor.getCurrentProgram();
+
+    if (program != currentIndex)
+    {
+        // The host moved its program selector: follow it, and take the pattern it just loaded as
+        // the saved state rather than marking it modified.
+        adoptProgram (program);
+        return;
+    }
+
+    if (processor.getSharedPattern().revision() != savedRevision)
         setDirty (true);
 }
 
-void PresetBar::markModified()
+void PresetBar::adoptProgram (int program)
 {
-    setDirty (true);
+    currentIndex = program;
+    savedRevision = processor.getSharedPattern().revision();
+    setDirty (false);
+    refreshName();
+    repaint();
 }
 
 void PresetBar::setDirty (bool shouldBeDirty)
@@ -108,31 +125,19 @@ void PresetBar::setDirty (bool shouldBeDirty)
 
 int PresetBar::currentIndexOrFactory() const
 {
-    return juce::jlimit (0, juce::jmax (0, library.entries().size() - 1), currentIndex);
-}
-
-int PresetBar::indexOfFile (const juce::File& file) const
-{
-    if (file == juce::File())
-        return 0;
-
-    const auto& entries = library.entries();
-
-    for (int i = 0; i < entries.size(); ++i)
-        if (entries[i].file == file)
-            return i;
-
-    return 0;
+    return juce::jlimit (0, juce::jmax (0, processor.getPresetEntries().size() - 1), currentIndex);
 }
 
 void PresetBar::refreshName()
 {
-    const auto& entries = library.entries();
+    const auto entries = processor.getPresetEntries();
     const auto index = currentIndexOrFactory();
-    const auto factory = index >= entries.size() || entries[index].isFactory;
+    const auto factory = ! juce::isPositiveAndBelow (index, entries.size())
+                            || entries[index].isFactory;
 
-    auto name = index < entries.size() ? entries[index].name
-                                       : juce::String (presets::Library::factoryName);
+    auto name = juce::isPositiveAndBelow (index, entries.size())
+                    ? entries[index].name
+                    : juce::String (presets::Library::factoryName);
 
     nameButton.setButtonText (dirty ? name + "  *" : name);
     saveButton.setEnabled (! factory);
@@ -141,29 +146,13 @@ void PresetBar::refreshName()
 
 void PresetBar::applyEntry (int index)
 {
-    const auto& entries = library.entries();
-
-    if (! juce::isPositiveAndBelow (index, entries.size()))
-        return;
-
-    Pattern loaded;
-    auto lane = selectedLane.load();
-
-    if (! library.load (entries[index], loaded, lane))
+    if (! processor.applyPreset (index))
     {
-        showError ("That file is not a preset this build can read.");
+        showError ("That preset could not be read. Its file may have been changed or removed.");
         return;
     }
 
-    shared.edit() = loaded;
-    selectedLane.store (juce::jlimit (0, maxLanes - 1, lane));
-    shared.publish();
-
-    currentIndex = index;
-    savedRevision = shared.revision();
-    setDirty (false);
-    refreshName();
-    repaint();
+    adoptProgram (processor.getCurrentProgram());
 
     if (onPresetLoaded != nullptr)
         onPresetLoaded();
@@ -171,7 +160,7 @@ void PresetBar::applyEntry (int index)
 
 void PresetBar::step (int offset)
 {
-    const auto count = library.entries().size();
+    const auto count = processor.getPresetEntries().size();
 
     if (count <= 0)
         return;
@@ -185,7 +174,7 @@ void PresetBar::showMenu()
     // The folder can change behind the plug-in's back; opening the list is the moment to look.
     reloadLibrary();
 
-    const auto& entries = library.entries();
+    const auto entries = processor.getPresetEntries();
     const auto selected = currentIndexOrFactory();
 
     juce::PopupMenu menu;
@@ -207,7 +196,7 @@ void PresetBar::showMenu()
 
                             if (result == 1000)
                             {
-                                safeThis->library.directory().revealToUser();
+                                safeThis->processor.getPresetFolder().revealToUser();
                                 return;
                             }
 
@@ -217,20 +206,17 @@ void PresetBar::showMenu()
 
 void PresetBar::saveCurrent()
 {
+    const auto entries = processor.getPresetEntries();
     const auto index = currentIndexOrFactory();
-    const auto& entries = library.entries();
 
-    if (index >= entries.size() || entries[index].isFactory)
+    if (! juce::isPositiveAndBelow (index, entries.size()) || entries[index].isFactory)
     {
         promptSaveAs();
         return;
     }
 
-    // Copy before saving: the library reloads its list, which replaces this entry.
-    const auto name = entries[index].name;
-    const auto file = entries[index].file;
-
-    const auto result = library.save (shared.edit(), selectedLane.load(), name, file);
+    int program = 0;
+    const auto result = processor.savePreset (entries[index].name, index, &program);
 
     if (result.failed())
     {
@@ -238,24 +224,21 @@ void PresetBar::saveCurrent()
         return;
     }
 
-    currentIndex = indexOfFile (file);
-    savedRevision = shared.revision();
-    setDirty (false);
-    refreshName();
-    repaint();
+    adoptProgram (program);
 }
 
 void PresetBar::promptSaveAs()
 {
+    const auto entries = processor.getPresetEntries();
     const auto index = currentIndexOrFactory();
-    const auto& entries = library.entries();
-    const auto suggested = index < entries.size() && ! entries[index].isFactory
+    const auto suggested = juce::isPositiveAndBelow (index, entries.size())
+                                   && ! entries[index].isFactory
                                ? entries[index].name
                                : juce::String ("My Pattern");
 
     auto* alert = new juce::AlertWindow ("Save preset",
                                          "Name for this preset. It is written to "
-                                             + library.directory().getFullPathName(),
+                                             + processor.getPresetFolder().getFullPathName(),
                                          juce::MessageBoxIconType::NoIcon);
     alert->addTextEditor ("name", suggested, "Name");
     alert->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
@@ -276,8 +259,8 @@ void PresetBar::promptSaveAs()
 
 void PresetBar::saveAs (const juce::String& name)
 {
-    juce::File saved;
-    const auto result = library.save (shared.edit(), selectedLane.load(), name, {}, &saved);
+    int program = 0;
+    const auto result = processor.savePreset (name, -1, &program);
 
     if (result.failed())
     {
@@ -285,23 +268,18 @@ void PresetBar::saveAs (const juce::String& name)
         return;
     }
 
-    currentIndex = indexOfFile (saved);
-    savedRevision = shared.revision();
-    setDirty (false);
-    refreshName();
-    repaint();
+    adoptProgram (program);
 }
 
 void PresetBar::confirmDelete()
 {
+    const auto entries = processor.getPresetEntries();
     const auto index = currentIndexOrFactory();
-    const auto& entries = library.entries();
 
-    if (index >= entries.size() || entries[index].isFactory)
+    if (! juce::isPositiveAndBelow (index, entries.size()) || entries[index].isFactory)
         return;
 
     const auto name = entries[index].name;
-    const auto file = entries[index].file;
 
     auto* alert = new juce::AlertWindow ("Delete preset",
                                          "Delete \"" + name + "\"? The file is removed from disk.",
@@ -312,16 +290,12 @@ void PresetBar::confirmDelete()
     juce::Component::SafePointer<PresetBar> safeThis (this);
 
     alert->enterModalState (true, juce::ModalCallbackFunction::create (
-                                [safeThis, file, name] (int result)
+                                [safeThis, index] (int result)
                                 {
                                     if (safeThis == nullptr || result != 1)
                                         return;
 
-                                    presets::Entry entry;
-                                    entry.name = name;
-                                    entry.file = file;
-
-                                    if (const auto removal = safeThis->library.remove (entry);
+                                    if (const auto removal = safeThis->processor.deletePreset (index);
                                         removal.failed())
                                     {
                                         safeThis->showError (removal.getErrorMessage());
@@ -330,7 +304,7 @@ void PresetBar::confirmDelete()
 
                                     // The pattern itself is left alone: the file is gone, but
                                     // nothing the player was working on is discarded.
-                                    safeThis->currentIndex = 0;
+                                    safeThis->currentIndex = safeThis->processor.getCurrentProgram();
                                     safeThis->setDirty (true);
                                     safeThis->refreshName();
                                     safeThis->repaint();

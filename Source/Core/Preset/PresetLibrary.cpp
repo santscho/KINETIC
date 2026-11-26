@@ -156,6 +156,37 @@ juce::Result Library::remove (const Entry& entry)
     return juce::Result::ok();
 }
 
+juce::Result Library::rename (const Entry& entry, const juce::String& newName,
+                              juce::File* renamedFile)
+{
+    if (entry.isFactory)
+        return juce::Result::fail ("The factory preset cannot be renamed.");
+
+    const auto cleanName = newName.trim();
+
+    if (cleanName.isEmpty())
+        return juce::Result::fail ("The preset name is empty.");
+
+    Pattern pattern;
+    auto lane = 0;
+
+    if (! load (entry, pattern, lane))
+        return juce::Result::fail ("The preset could not be read.");
+
+    // The new document is written before the old one goes, so a failed write cannot lose the
+    // pattern. Renaming to the same file name only rewrites its name attribute.
+    const auto target = fileForName (cleanName);
+
+    if (const auto result = save (pattern, lane, cleanName, target, renamedFile); result.failed())
+        return result;
+
+    if (target != entry.file)
+        entry.file.deleteFile();
+
+    reload();
+    return juce::Result::ok();
+}
+
 juce::File Library::defaultDirectory()
 {
     return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
