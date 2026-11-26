@@ -73,6 +73,17 @@ public:
     int indexOfFile (const juce::File& file) const;
 
     /**
+        The entry a stored preset refers to, or 0 when it no longer exists.
+
+        A session saves the preset it was using as a file name and its category rather than an
+        entry number: numbers move when the folder changes, while a name stays attached to its
+        preset. The category is what tells two presets of the same name apart, and a file that
+        was moved to another folder is still found by its name alone - only a preset that has
+        been deleted falls back to the factory entry.
+    */
+    int indexForFileName (const juce::String& fileName, const juce::String& category = {}) const;
+
+    /**
         Writes `pattern` as a preset called `name` in `category`.
 
         When `replacing` points at an existing preset its file is overwritten and the name is
@@ -171,21 +182,6 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Library)
 };
 
-/**
-    The entry a stored file name refers to, or 0 when it no longer exists.
 
-    A session saves the preset it was using as a file name rather than an entry number, so a
-    folder that gained, lost or renamed presets in between still resolves to the right preset, and
-    a preset that has been deleted falls back to the factory entry.
-*/
-inline int indexForFileName (const Library& library, const juce::String& fileName)
-{
-    if (fileName.isEmpty())
-        return 0;
-
-    const auto index = library.indexOfFile (library.directory().getChildFile (fileName));
-
-    return index >= 0 ? index : 0;
-}
 
 } // namespace kinetic::presets

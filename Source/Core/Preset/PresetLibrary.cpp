@@ -142,6 +142,27 @@ int Library::indexOfFile (const juce::File& file) const
     return -1;
 }
 
+int Library::indexForFileName (const juce::String& fileName, const juce::String& category) const
+{
+    if (fileName.isEmpty())
+        return 0;
+
+    // The category is checked first, so two categories holding a preset of the same name still
+    // resolve to the one the session was saved with.
+    if (category.isNotEmpty())
+        if (const auto index = indexOfFile (categoryDirectory (category).getChildFile (fileName));
+            index >= 0)
+            return index;
+
+    // Either the category has been renamed since, or the file was moved between folders by hand:
+    // the name alone still identifies the preset.
+    for (int i = 0; i < list.size(); ++i)
+        if (! list[i].isFactory && list[i].file.getFileName() == fileName)
+            return i;
+
+    return 0;
+}
+
 juce::String Library::readName (const juce::File& file)
 {
     const auto xml = juce::XmlDocument::parse (file);

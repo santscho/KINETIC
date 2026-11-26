@@ -436,9 +436,11 @@ inside the host's session via the plug-in state. Notes:
 - Pressing play on a device whose state was never saved leaves the pattern in the editor only. If
   the pattern matters, save the host set.
 - The session also remembers which preset it was using, so reopening a project shows that
-  preset in the header and in the host's program menu. Only the preset's file name is stored: if
-  it has been deleted or renamed since, the project opens on `FACTORY DEFAULT` and still plays
-  the pattern it saved, which is part of the session itself (§4.6).
+  preset in the header and in the host's program menu. Its file name and its category are
+  stored, so a preset in a category is found again inside that folder and two presets of the same
+  name in different categories stay apart. A preset moved to another folder is still found by its
+  name; if it has been deleted or renamed since, the project opens on `FACTORY DEFAULT` and still
+  plays the pattern it saved, which is part of the session itself (§4.6).
 
 ---
 

@@ -24,6 +24,7 @@ public:
         testDelete();
         testIndexOfFileSurvivesASort();
         testStoredFileNameFallsBackToFactory();
+        testCategoryPresetSurvivesReopening();
         testFolderChangesArePickedUp();
         testExportAndImport();
         testImportPolicies();
@@ -190,13 +191,56 @@ private:
         juce::File saved;
         expect (library.save (makePattern(), 0, "Saved", {}, &saved).wasOk());
 
-        expectEquals (presets::indexForFileName (library, saved.getFileName()), 1);
+        expectEquals (library.indexForFileName (saved.getFileName()), 1);
 
         // Deleted or renamed since the session was saved.
-        expectEquals (presets::indexForFileName (library, "Gone.kineticpreset"), 0);
+        expectEquals (library.indexForFileName ("Gone.kineticpreset"), 0);
 
         // A session that never used a preset.
-        expectEquals (presets::indexForFileName (library, {}), 0);
+        expectEquals (library.indexForFileName ({}), 0);
+    }
+
+    void testCategoryPresetSurvivesReopening()
+    {
+        beginTest ("A preset saved in a category is found again when the session is reopened");
+
+        auto session = makeLibrary ("session-category");
+        expect (session.createCategory ("Bass").wasOk());
+
+        // One preset of that name in each category, so the category is what tells them apart.
+        auto deepPattern = makePattern();
+        deepPattern.rootNote = 40;
+
+        juce::File userFile, bassFile;
+        expect (session.save (makePattern(), 0, "Bass", {}, &userFile).wasOk());
+        expect (session.save (deepPattern, 4, "Bass", {}, &bassFile, "Bass").wasOk());
+
+        expect (bassFile.getParentDirectory() == session.directory().getChildFile ("Bass"));
+        expectEquals (bassFile.getFileName(), juce::String ("Bass.kineticpreset"));
+
+        // What the session stores: the bare file name plus the category.
+        const auto storedName = bassFile.getFileName();
+        const auto storedCategory = session.entries()[session.indexOfFile (bassFile)].category;
+
+        // Reopening builds a new library over the same folder.
+        presets::Library reopened (session.directory());
+        expect (reopened.categories().contains ("Bass"));
+
+        const auto resolved = reopened.indexForFileName (storedName, storedCategory);
+        expect (resolved > 0, "the preset fell back to the factory entry");
+        expectEquals (reopened.entries()[resolved].category, juce::String ("Bass"));
+
+        Pattern loaded;
+        int lane = 0;
+        expect (reopened.load (reopened.entries()[resolved], loaded, lane));
+        expectEquals (loaded.rootNote, 40);
+        expectEquals (lane, 4);
+
+        // The name alone would be ambiguous; the category picks the right one.
+        const auto userResolved = reopened.indexForFileName (
+            userFile.getFileName(), presets::Library::defaultCategoryName);
+        expectEquals (reopened.entries()[userResolved].category,
+                      juce::String (presets::Library::defaultCategoryName));
     }
 
     void testFolderChangesArePickedUp()
