@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -28,6 +29,31 @@ public:
     void refreshAll();
 
 private:
+    /**
+        Root note of the lane: the twelve notes of the octave the note is in, with buttons on the
+        left that move it one octave at a time.
+    */
+    class RootNoteSelector final : public juce::Component
+    {
+    public:
+        RootNoteSelector();
+
+        void resized() override;
+
+        std::function<void (int)> onNoteChange;
+
+        /** Sets the note without notifying; the list follows the note's octave. */
+        void setNote (int newNote);
+
+    private:
+        void shiftOctave (int direction);
+        void rebuildItems();
+
+        juce::TextButton downButton { "-" }, upButton { "+" };
+        juce::ComboBox noteBox;
+        int note = 60;
+    };
+
     Lane& currentLane() noexcept { return shared.edit().lanes[static_cast<std::size_t> (laneIndex)]; }
 
     void selectLane (int index);
@@ -42,6 +68,7 @@ private:
     juce::TextButton enableButton;
     juce::Slider lengthSlider;
     juce::ComboBox dividerBox, modifierBox, directionBox;
+    RootNoteSelector rootNoteSelector;
 
     int laneIndex = 0;
 
