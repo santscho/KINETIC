@@ -24,6 +24,7 @@ public:
         testDelete();
         testIndexOfFileSurvivesASort();
         testStoredFileNameFallsBackToFactory();
+        testFolderChangesArePickedUp();
         testRename();
         testEmptyNameIsRefused();
     }
@@ -193,6 +194,43 @@ private:
 
         // A session that never used a preset.
         expectEquals (presets::indexForFileName (library, {}), 0);
+    }
+
+    void testFolderChangesArePickedUp()
+    {
+        beginTest ("A changed folder is noticed, stat-ed between checks rather than scanned");
+
+        auto library = makeLibrary ("stale");
+
+        // A fresh library has just read the folder.
+        expect (! library.refreshIfChanged (0));
+        expectEquals (library.entries().size(), 1);
+
+        // Somebody else writes a preset into the same folder.
+        juce::Thread::sleep (20);
+
+        juce::File written;
+        expect (presets::Library (library.directory())
+                    .save (makePattern(), 0, "Added Outside", {}, &written).wasOk());
+
+        // Inside the interval the check does not even look at the folder.
+        expect (! library.refreshIfChanged (60000));
+        expectEquals (library.entries().size(), 1);
+
+        // Past it, the folder's timestamp is read and the list picks the preset up.
+        expect (library.refreshIfChanged (0));
+        expectEquals (library.entries().size(), 2);
+        expectEquals (library.entries()[1].name, juce::String ("Added Outside"));
+
+        // Nothing moved since: another look is a no-op.
+        expect (! library.refreshIfChanged (0));
+
+        // A removal is noticed the same way.
+        juce::Thread::sleep (20);
+        expect (written.deleteFile());
+
+        expect (library.refreshIfChanged (0));
+        expectEquals (library.entries().size(), 1);
     }
 
     void testRename()

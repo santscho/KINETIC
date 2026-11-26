@@ -136,11 +136,6 @@ private:
     juce::StringArray programNames;
     mutable juce::CriticalSection programLock;
 
-    // Message thread only: the folder's timestamp when the names were last read, and when they
-    // were last checked, so a host polling its list cannot turn into a folder scan per query.
-    juce::Time folderStamp;
-    juce::uint32 lastPresetScanMs = 0;
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KineticAudioProcessor)
 };
 
