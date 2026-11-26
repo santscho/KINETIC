@@ -50,6 +50,27 @@ KINETIC_INSTALL_PLUGINS=OFF Scripts/build.sh Release   # build only, no install
 The install step ad-hoc signs the bundle, verifies the seal, copies it with `rsync --delete` and
 verifies the installed copy. `KINETIC_INSTALL_PLUGINS` (default `ON`) controls it; CI sets it off.
 
+### Installing from a disk image
+
+A packaged build is a `.dmg` holding both bundles, the licence, this manual and a
+`READ ME FIRST.txt`. It is not signed with a Developer ID and not notarised, so macOS may refuse to
+open the image, and — because a download's quarantine flag travels with the bundles that are
+copied out of it — a host may refuse or silently skip the plug-in afterwards. The READ ME covers
+both cases; in short, remove the flag from the image before opening it:
+
+```bash
+xattr -dr com.apple.quarantine ~/Downloads/KINETIC-0.6.0-macOS-arm64.dmg
+```
+
+and then from the installed copies before starting the host:
+
+```bash
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/KINETIC.component
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/KINETIC.vst3
+```
+
+Build one with `Scripts/package-dmg.sh Release universal`; the image is written to `build/`.
+
 After installing a new build, hosts that already loaded the previous binary keep it mapped.
 **Quit the host fully and reopen it** — rescanning plug-ins is not enough, because the running
 process holds the old image.
